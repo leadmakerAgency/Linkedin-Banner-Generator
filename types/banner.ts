@@ -37,6 +37,9 @@ export type FontStyleId =
   | "dmSans"
   | "libreBaskerville";
 export type CompanyNameColorMode = "auto" | "manual";
+
+/** Numeric CSS/SVG font-weight values (100–900). */
+export type FontWeightId = "300" | "400" | "500" | "600" | "700" | "800";
 export type RevisionAction =
   | "move-left"
   | "more-premium"
@@ -52,6 +55,10 @@ export interface BannerFormValues {
   companyDescription: string;
   companyNameFontStyle: FontStyleId;
   companyDescriptionFontStyle: FontStyleId;
+  companyNameFontSize: number;
+  companyDescriptionFontSize: number;
+  companyNameFontWeight: FontWeightId;
+  companyDescriptionFontWeight: FontWeightId;
   companyNameColorMode: CompanyNameColorMode;
   companyNameTextColor: string;
   companyDescriptionColorMode: CompanyNameColorMode;
@@ -60,6 +67,9 @@ export interface BannerFormValues {
   primaryBrandColor: string;
   secondaryBrandColor: string;
   phoneNumber: string;
+  /** Pixels to nudge only the phone handset icon (number stays fixed); positive X = right, positive Y = down. */
+  phoneIconOffsetX: number;
+  phoneIconOffsetY: number;
   stylePreset: StylePresetId;
   imageModel: ImageModelId;
 }
@@ -73,3 +83,6 @@ export interface GenerateResponse {
   imageUrl: string;
   filename: string;
 }
+
+/** Client workflow: GPT background first, then editable overlay (no GPT on overlay edits). */
+export type GenerationStage = "idle" | "generatingBackground" | "editingOverlay" | "exporting";

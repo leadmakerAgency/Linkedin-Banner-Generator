@@ -3,14 +3,9 @@ import { parseBannerInput, runBackgroundOnlyGeneration } from "@/lib/generateBan
 
 export const runtime = "nodejs";
 
-/** Regenerates GPT background only (revision patch). Client merges overlay via /api/render-overlay. */
 export const POST = async (request: Request) => {
   try {
     const formData = await request.formData();
-    if (!formData.get("revisionAction")) {
-      return NextResponse.json({ error: "revisionAction is required." }, { status: 400 });
-    }
-
     const { values, primaryLogo, secondaryLogo } = parseBannerInput(formData);
     const output = await runBackgroundOnlyGeneration(values, primaryLogo, secondaryLogo);
 
@@ -20,7 +15,7 @@ export const POST = async (request: Request) => {
       filename: output.filename
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to revise banner.";
+    const message = error instanceof Error ? error.message : "Failed to generate background.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 };

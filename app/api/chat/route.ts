@@ -22,6 +22,8 @@ const stylePresetSchema = z.enum([
   "gradient-wave"
 ]);
 
+const fontWeightSchema = z.enum(["300", "400", "500", "600", "700", "800"]);
+
 const fontStyleSchema = z.enum([
   "inter",
   "poppins",
@@ -51,6 +53,10 @@ const settingsSchema = z.object({
   companyDescription: z.string(),
   companyNameFontStyle: fontStyleSchema,
   companyDescriptionFontStyle: fontStyleSchema,
+  companyNameFontSize: z.number().int().min(42).max(108),
+  companyDescriptionFontSize: z.number().int().min(16).max(40),
+  companyNameFontWeight: fontWeightSchema,
+  companyDescriptionFontWeight: fontWeightSchema,
   companyNameColorMode: z.enum(["auto", "manual"]),
   companyNameTextColor: z.string(),
   companyDescriptionColorMode: z.enum(["auto", "manual"]),
@@ -59,6 +65,8 @@ const settingsSchema = z.object({
   primaryBrandColor: z.string(),
   secondaryBrandColor: z.string(),
   phoneNumber: z.string(),
+  phoneIconOffsetX: z.number().int().min(-400).max(400),
+  phoneIconOffsetY: z.number().int().min(-200).max(200),
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
   stylePreset: stylePresetSchema
 });
@@ -74,6 +82,10 @@ const patchSchema = z.object({
   companyDescription: z.string().max(80).optional(),
   companyNameFontStyle: fontStyleSchema.optional(),
   companyDescriptionFontStyle: fontStyleSchema.optional(),
+  companyNameFontSize: z.number().int().min(42).max(108).optional(),
+  companyDescriptionFontSize: z.number().int().min(16).max(40).optional(),
+  companyNameFontWeight: fontWeightSchema.optional(),
+  companyDescriptionFontWeight: fontWeightSchema.optional(),
   companyNameColorMode: z.enum(["auto", "manual"]).optional(),
   companyNameTextColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   companyDescriptionColorMode: z.enum(["auto", "manual"]).optional(),
@@ -82,6 +94,8 @@ const patchSchema = z.object({
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   phoneNumber: z.string().max(40).optional(),
+  phoneIconOffsetX: z.number().int().min(-400).max(400).optional(),
+  phoneIconOffsetY: z.number().int().min(-200).max(200).optional(),
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]).optional(),
   stylePreset: stylePresetSchema.optional()
 });
@@ -146,7 +160,7 @@ export const POST = async (request: Request) => {
             {
               role: "system",
               content:
-                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, imageModel, stylePreset."
+                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameFontSize, companyDescriptionFontSize, companyNameFontWeight, companyDescriptionFontWeight, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, phoneIconOffsetX, phoneIconOffsetY, imageModel, stylePreset."
             },
             {
               role: "user",

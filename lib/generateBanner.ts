@@ -1,3 +1,5 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import { z } from "zod";
 import { generateCreativeBaseImage } from "@/lib/openai";
 import { buildStructuredPrompt } from "@/lib/promptBuilder";
@@ -62,6 +64,10 @@ const generationSchema = z.object({
     "dmSans",
     "libreBaskerville"
   ]),
+  companyNameFontSize: z.coerce.number().int().min(42).max(108),
+  companyDescriptionFontSize: z.coerce.number().int().min(16).max(40),
+  companyNameFontWeight: z.enum(["300", "400", "500", "600", "700", "800"]),
+  companyDescriptionFontWeight: z.enum(["300", "400", "500", "600", "700", "800"]),
   companyNameColorMode: z.enum(["auto", "manual"]),
   companyNameTextColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   companyDescriptionColorMode: z.enum(["auto", "manual"]),
@@ -70,6 +76,8 @@ const generationSchema = z.object({
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   phoneNumber: z.string().trim().min(6).max(40),
+  phoneIconOffsetX: z.coerce.number().int().min(-400).max(400),
+  phoneIconOffsetY: z.coerce.number().int().min(-200).max(200),
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
   stylePreset: z.enum([
     "corporate",
@@ -126,6 +134,31 @@ export interface GeneratedBannerResult {
   filename: string;
   imageUrl: string;
 }
+
+/** Resize/crop AI output to banner size and remove transparency. */
+export const normalizeBackgroundBuffer = async (buffer: Buffer, flattenColor: string): Promise<Buffer> => {
+  return sharp(buffer)
+    .resize(BANNER_WIDTH, BANNER_HEIGHT, {
+      fit: "cover",
+      position: "centre"
+    })
+    .flatten({ background: flattenColor })
+    .png()
+    .toBuffer();
+};
+
+/** Load a previously saved background from `public/generated/...`. */
+export const readBackgroundBufferFromPublicUrl = async (publicUrl: string): Promise<Buffer> => {
+  if (!publicUrl.startsWith("/generated/")) {
+    throw new Error("Invalid background URL.");
+  }
+  const basename = path.basename(publicUrl);
+  if (!/^[a-zA-Z0-9-]+\.png$/i.test(basename)) {
+    throw new Error("Invalid background filename.");
+  }
+  const fullPath = path.join(process.cwd(), "public", "generated", basename);
+  return readFile(fullPath);
+};
 
 const resizeLogoBuffer = async (buffer: Buffer, maxWidth: number, maxHeight: number): Promise<Buffer> => {
   return sharp(buffer).resize({ width: maxWidth, height: maxHeight, fit: "inside", withoutEnlargement: true }).png().toBuffer();
@@ -222,7 +255,7 @@ const resolveAutoContrastColor = async (
   return avgLuminance > 0.45 ? "#1E293B" : "#FFFFFF";
 };
 
-const overlayBrandElements = async (
+export const overlayBrandElements = async (
   bannerBuffer: Buffer,
   values: BannerGenerationInput,
   patchLogoScale: number,
@@ -289,6 +322,12 @@ const overlayBrandElements = async (
   const companyName = escapeXml(values.companyName);
   const descriptionLines = wrapTextLines(values.companyDescription, 62, 2).map((line) => escapeXml(line));
   const phone = escapeXml(values.phoneNumber);
+  const companyNameFontSize = values.companyNameFontSize;
+  const companyDescriptionFontSize = values.companyDescriptionFontSize;
+  const companyNameFontWeight = values.companyNameFontWeight;
+  const companyDescriptionFontWeight = values.companyDescriptionFontWeight;
+  const descriptionLineGap = Math.round(companyDescriptionFontSize * 1.25);
+  const descriptionStartY = titleY + Math.round(companyNameFontSize * 0.54);
   const autoNameColorSampleArea = {
     left: currentLeft,
     top: Math.max(0, titleY - 56),
@@ -297,7 +336,7 @@ const overlayBrandElements = async (
   };
   const autoDescriptionColorSampleArea = {
     left: currentLeft,
-    top: Math.max(0, titleY + 10),
+    top: Math.max(0, descriptionStartY - companyDescriptionFontSize),
     width: Math.max(220, BANNER_WIDTH - currentLeft - 180),
     height: 80
   };
@@ -326,24 +365,27 @@ const overlayBrandElements = async (
   const phoneBaselineY = BANNER_HEIGHT - 8;
   const approxPhoneWidth = Math.max(90, Math.round(phone.length * phoneFontSize * 0.55));
   const iconGap = 4;
-  const iconX = phoneAnchorX - approxPhoneWidth - iconSize - iconGap;
-  const iconY = phoneBaselineY - iconSize + 11;
+  const baseIconX = phoneAnchorX - approxPhoneWidth - iconSize - iconGap;
+  const baseIconY = phoneBaselineY - iconSize + 11;
+  const iconX = Math.min(BANNER_WIDTH - iconSize - 2, Math.max(2, baseIconX + values.phoneIconOffsetX));
+  const iconY = Math.min(BANNER_HEIGHT - iconSize - 2, Math.max(2, baseIconY + values.phoneIconOffsetY));
+  const phoneTextY = iconY + iconSize / 2;
 
   const textOverlaySvg = `
     <svg width="${BANNER_WIDTH}" height="${BANNER_HEIGHT}" viewBox="0 0 ${BANNER_WIDTH} ${BANNER_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <text x="${currentLeft}" y="${titleY}" fill="${companyNameTextColor}" font-size="74" font-weight="700" font-family="${companyNameFontFamily}">
+      <text x="${currentLeft}" y="${titleY}" fill="${companyNameTextColor}" font-size="${companyNameFontSize}" font-weight="${companyNameFontWeight}" font-family="${companyNameFontFamily}">
         ${companyName}
       </text>
-      <text x="${currentLeft}" y="${titleY + 40}" fill="${descriptionTextColor}" font-size="24" font-weight="500" font-family="${descriptionFontFamily}">
+      <text x="${currentLeft}" y="${descriptionStartY}" fill="${descriptionTextColor}" font-size="${companyDescriptionFontSize}" font-weight="${companyDescriptionFontWeight}" font-family="${descriptionFontFamily}">
         ${(descriptionLines[0] ?? "")}
       </text>
-      <text x="${currentLeft}" y="${titleY + 70}" fill="${descriptionTextColor}" font-size="24" font-weight="500" font-family="${descriptionFontFamily}">
+      <text x="${currentLeft}" y="${descriptionStartY + descriptionLineGap}" fill="${descriptionTextColor}" font-size="${companyDescriptionFontSize}" font-weight="${companyDescriptionFontWeight}" font-family="${descriptionFontFamily}">
         ${(descriptionLines[1] ?? "")}
       </text>
       <g transform="translate(${iconX} ${iconY}) scale(${iconSize / 24})">
         <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
       </g>
-      <text x="${phoneAnchorX}" y="${phoneBaselineY}" fill="${phoneTextColor}" font-size="${phoneFontSize}" font-weight="500" text-anchor="end" font-family="Inter, Arial, sans-serif">
+      <text x="${phoneAnchorX}" y="${phoneTextY}" fill="${phoneTextColor}" font-size="${phoneFontSize}" font-weight="500" text-anchor="end" dominant-baseline="middle" font-family="Inter, Arial, sans-serif">
         ${phone}
       </text>
     </svg>
@@ -357,6 +399,49 @@ const overlayBrandElements = async (
   return sharp(bannerBuffer).composite(overlays).flatten({ background: values.secondaryBrandColor }).png().toBuffer();
 };
 
+/** GPT image only; saved as PNG under public/generated. Does not composite logos/text. */
+export const runBackgroundOnlyGeneration = async (
+  values: BannerGenerationInput,
+  primaryLogo?: File | null,
+  secondaryLogo?: File | null
+): Promise<GeneratedBannerResult> => {
+  const patch = getRevisionPatch(values.revisionAction);
+  // Background stage intentionally excludes direct brand text/logo cues.
+  void primaryLogo;
+  void secondaryLogo;
+
+  const prompt = buildStructuredPrompt({
+    values,
+    promptDelta: patch.promptDelta,
+    reduceClutter: patch.reduceClutter
+  });
+
+  const baseImageBuffer = await generateCreativeBaseImage(prompt, values.regenerateNonce, values.imageModel);
+  const basePngBuffer = await normalizeBackgroundBuffer(baseImageBuffer, values.secondaryBrandColor);
+  const stored = await saveOutputPng(basePngBuffer);
+  return {
+    filename: stored.filename,
+    imageUrl: stored.publicUrl
+  };
+};
+
+/** Deterministic logos + text + phone on top of an existing background asset. */
+export const runOverlayRender = async (
+  backgroundPublicUrl: string,
+  values: BannerGenerationInput,
+  primaryLogo: File | null,
+  secondaryLogo: File | null
+): Promise<GeneratedBannerResult> => {
+  const buffer = await readBackgroundBufferFromPublicUrl(backgroundPublicUrl);
+  const patch = getRevisionPatch(undefined);
+  const pngBuffer = await overlayBrandElements(buffer, values, patch.logoScale, primaryLogo, secondaryLogo);
+  const stored = await saveOutputPng(pngBuffer);
+  return {
+    filename: stored.filename,
+    imageUrl: stored.publicUrl
+  };
+};
+
 export const parseBannerInput = (formData: FormData): {
   values: BannerGenerationInput;
   primaryLogo: File | null;
@@ -368,6 +453,10 @@ export const parseBannerInput = (formData: FormData): {
     companyDescription: parseFormValue(formData.get("companyDescription")),
     companyNameFontStyle: parseFormValue(formData.get("companyNameFontStyle")) as BannerGenerationInput["companyNameFontStyle"],
     companyDescriptionFontStyle: parseFormValue(formData.get("companyDescriptionFontStyle")) as BannerGenerationInput["companyDescriptionFontStyle"],
+    companyNameFontSize: parseFormValue(formData.get("companyNameFontSize")),
+    companyDescriptionFontSize: parseFormValue(formData.get("companyDescriptionFontSize")),
+    companyNameFontWeight: parseFormValue(formData.get("companyNameFontWeight")) as BannerGenerationInput["companyNameFontWeight"],
+    companyDescriptionFontWeight: parseFormValue(formData.get("companyDescriptionFontWeight")) as BannerGenerationInput["companyDescriptionFontWeight"],
     companyNameColorMode: parseFormValue(formData.get("companyNameColorMode")) as BannerGenerationInput["companyNameColorMode"],
     companyNameTextColor: parseFormValue(formData.get("companyNameTextColor")),
     companyDescriptionColorMode: parseFormValue(
@@ -378,6 +467,8 @@ export const parseBannerInput = (formData: FormData): {
     primaryBrandColor: parseFormValue(formData.get("primaryBrandColor")),
     secondaryBrandColor: parseFormValue(formData.get("secondaryBrandColor")),
     phoneNumber: parseFormValue(formData.get("phoneNumber")),
+    phoneIconOffsetX: parseFormValue(formData.get("phoneIconOffsetX")),
+    phoneIconOffsetY: parseFormValue(formData.get("phoneIconOffsetY")),
     imageModel: parseFormValue(formData.get("imageModel")) as BannerGenerationInput["imageModel"],
     stylePreset: parseFormValue(formData.get("stylePreset")) as StylePresetId
   });
@@ -421,15 +512,7 @@ export const runBannerGeneration = async (
   });
 
   const baseImageBuffer = await generateCreativeBaseImage(prompt, values.regenerateNonce, values.imageModel);
-  const basePngBuffer = await sharp(baseImageBuffer)
-    .resize(BANNER_WIDTH, BANNER_HEIGHT, {
-      fit: "cover",
-      position: "centre"
-    })
-    .flatten({ background: values.secondaryBrandColor })
-    .png()
-    .toBuffer();
-
+  const basePngBuffer = await normalizeBackgroundBuffer(baseImageBuffer, values.secondaryBrandColor);
   const pngBuffer = await overlayBrandElements(basePngBuffer, values, patch.logoScale, primaryLogo, secondaryLogo);
 
   const stored = await saveOutputPng(pngBuffer);

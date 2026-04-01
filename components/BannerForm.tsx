@@ -1,6 +1,6 @@
 "use client";
 
-import { BannerFormValues, BannerType, CompanyPageType, StylePresetId, FontStyleId } from "@/types/banner";
+import { BannerFormValues, BannerType, CompanyPageType, FontWeightId, StylePresetId, FontStyleId } from "@/types/banner";
 
 export interface BannerFiles {
   primaryLogo: File | null;
@@ -44,6 +44,15 @@ const imageModels: Array<{ value: BannerFormValues["imageModel"]; label: string 
   { value: "gpt-image-1-mini", label: "GPT Image 1 Mini (faster)" }
 ];
 
+const fontWeights: Array<{ value: FontWeightId; label: string }> = [
+  { value: "300", label: "Light (300)" },
+  { value: "400", label: "Regular (400)" },
+  { value: "500", label: "Medium (500)" },
+  { value: "600", label: "Semibold (600)" },
+  { value: "700", label: "Bold (700)" },
+  { value: "800", label: "Extrabold (800)" }
+];
+
 const fontStyles: Array<{ value: FontStyleId; label: string }> = [
   { value: "inter", label: "Inter" },
   { value: "poppins", label: "Poppins" },
@@ -74,7 +83,7 @@ export const BannerForm = ({
   onValuesChange,
   onFilesChange
 }: BannerFormProps) => {
-  const handleInputChange = (field: keyof BannerFormValues, value: string) => {
+  const handleInputChange = (field: keyof BannerFormValues, value: string | number) => {
     onValuesChange({
       ...values,
       [field]: value
@@ -140,82 +149,6 @@ export const BannerForm = ({
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
-          Company Description
-          <textarea
-            className="min-h-24 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.companyDescription}
-            onChange={(event) => handleInputChange("companyDescription", event.target.value)}
-            placeholder="Lead Generation through strategic marketing campaigns, virtual assistants, and call centers in the Philippines and beyond."
-            maxLength={80}
-            required
-          />
-          <span className="text-xs font-normal text-slate-400">{values.companyDescription.length}/80</span>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Primary Brand Color
-          <input
-            type="color"
-            className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70"
-            value={values.primaryBrandColor}
-            onChange={(event) => handleInputChange("primaryBrandColor", event.target.value)}
-            aria-label="Primary brand color"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Secondary Brand Color
-          <input
-            type="color"
-            className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70"
-            value={values.secondaryBrandColor}
-            onChange={(event) => handleInputChange("secondaryBrandColor", event.target.value)}
-            aria-label="Secondary brand color"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Phone Number
-          <input
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.phoneNumber}
-            onChange={(event) => handleInputChange("phoneNumber", event.target.value)}
-            placeholder="+1 555 010 234"
-            required
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Style Preset
-          <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.stylePreset}
-            onChange={(event) => handleInputChange("stylePreset", event.target.value)}
-          >
-            {stylePresets.map((stylePreset) => (
-              <option key={stylePreset.value} value={stylePreset.value}>
-                {stylePreset.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Image Model
-          <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.imageModel}
-            onChange={(event) => handleInputChange("imageModel", event.target.value)}
-          >
-            {imageModels.map((imageModel) => (
-              <option key={imageModel.value} value={imageModel.value}>
-                {imageModel.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Company Name Font
           <select
@@ -232,18 +165,16 @@ export const BannerForm = ({
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-          Description Font
-          <select
+          Company Name Font Size
+          <input
+            type="number"
+            min={42}
+            max={108}
+            step={1}
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.companyDescriptionFontStyle}
-            onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
-          >
-            {fontStyles.map((fontStyle) => (
-              <option key={fontStyle.value} value={fontStyle.value}>
-                {fontStyle.label}
-              </option>
-            ))}
-          </select>
+            value={values.companyNameFontSize}
+            onChange={(event) => handleInputChange("companyNameFontSize", Number(event.target.value))}
+          />
         </label>
 
         <div className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
@@ -280,6 +211,62 @@ export const BannerForm = ({
           </div>
         </div>
 
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          Company Name Font Weight
+          <select
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.companyNameFontWeight}
+            onChange={(event) => handleInputChange("companyNameFontWeight", event.target.value as FontWeightId)}
+          >
+            {fontWeights.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          Company Description
+          <textarea
+            className="min-h-24 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.companyDescription}
+            onChange={(event) => handleInputChange("companyDescription", event.target.value)}
+            placeholder="Lead Generation through strategic marketing campaigns, virtual assistants, and call centers in the Philippines and beyond."
+            maxLength={80}
+            required
+          />
+          <span className="text-xs font-normal text-slate-400">{values.companyDescription.length}/80</span>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Description Font
+          <select
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.companyDescriptionFontStyle}
+            onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
+          >
+            {fontStyles.map((fontStyle) => (
+              <option key={fontStyle.value} value={fontStyle.value}>
+                {fontStyle.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Description Font Size
+          <input
+            type="number"
+            min={16}
+            max={40}
+            step={1}
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.companyDescriptionFontSize}
+            onChange={(event) => handleInputChange("companyDescriptionFontSize", Number(event.target.value))}
+          />
+        </label>
+
         <div className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
           <span>Company Description Text Color</span>
           <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
@@ -313,6 +300,118 @@ export const BannerForm = ({
             />
           </div>
         </div>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          Description Font Weight
+          <select
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.companyDescriptionFontWeight}
+            onChange={(event) => handleInputChange("companyDescriptionFontWeight", event.target.value as FontWeightId)}
+          >
+            {fontWeights.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Primary Brand Color
+          <input
+            type="color"
+            className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70"
+            value={values.primaryBrandColor}
+            onChange={(event) => handleInputChange("primaryBrandColor", event.target.value)}
+            aria-label="Primary brand color"
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Secondary Brand Color
+          <input
+            type="color"
+            className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70"
+            value={values.secondaryBrandColor}
+            onChange={(event) => handleInputChange("secondaryBrandColor", event.target.value)}
+            aria-label="Secondary brand color"
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Phone Number
+          <input
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.phoneNumber}
+            onChange={(event) => handleInputChange("phoneNumber", event.target.value)}
+            placeholder="+1 555 010 234"
+            required
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Phone icon offset X (px)
+          <input
+            type="number"
+            min={-400}
+            max={400}
+            step={1}
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.phoneIconOffsetX}
+            onChange={(event) => handleInputChange("phoneIconOffsetX", Number(event.target.value))}
+            aria-describedby="phone-offset-x-hint"
+          />
+          <span id="phone-offset-x-hint" className="text-xs font-normal text-slate-500">
+            Nudges only the handset icon; positive = right, negative = left. Phone number stays put.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Phone icon offset Y (px)
+          <input
+            type="number"
+            min={-200}
+            max={200}
+            step={1}
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.phoneIconOffsetY}
+            onChange={(event) => handleInputChange("phoneIconOffsetY", Number(event.target.value))}
+            aria-describedby="phone-offset-y-hint"
+          />
+          <span id="phone-offset-y-hint" className="text-xs font-normal text-slate-500">
+            Nudges only the icon; positive = down, negative = up.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Style Preset
+          <select
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.stylePreset}
+            onChange={(event) => handleInputChange("stylePreset", event.target.value)}
+          >
+            {stylePresets.map((stylePreset) => (
+              <option key={stylePreset.value} value={stylePreset.value}>
+                {stylePreset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          Image Model
+          <select
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.imageModel}
+            onChange={(event) => handleInputChange("imageModel", event.target.value)}
+          >
+            {imageModels.map((imageModel) => (
+              <option key={imageModel.value} value={imageModel.value}>
+                {imageModel.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Primary Logo (Optional)

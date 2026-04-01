@@ -21,6 +21,8 @@ interface ChatAssistantProps {
   embedded?: boolean;
   onPatchSettings: (patch: Partial<BannerFormValues>) => void;
   onGenerate: () => void;
+  /** Defaults to "Generate background" / "Regenerate background (GPT)" when omitted by parent. */
+  generateButtonLabel?: string;
 }
 
 const createId = (): string => {
@@ -30,7 +32,14 @@ const createId = (): string => {
   return `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 };
 
-export const ChatAssistant = ({ settings, draftPrompt, embedded = false, onPatchSettings, onGenerate }: ChatAssistantProps) => {
+export const ChatAssistant = ({
+  settings,
+  draftPrompt,
+  embedded = false,
+  onPatchSettings,
+  onGenerate,
+  generateButtonLabel = "Generate background"
+}: ChatAssistantProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "assistant-welcome",
@@ -159,7 +168,9 @@ export const ChatAssistant = ({ settings, draftPrompt, embedded = false, onPatch
     <section className={embedded ? "mt-6 border-t border-slate-800 pt-6" : "rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)]"}>
       <div className="mb-4">
         <h2 className="text-lg font-semibold tracking-tight text-slate-100">AI Assistant</h2>
-        <p className="mt-1 text-sm text-slate-400">Use chat to refine settings, then generate final banner variants.</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Use chat to refine settings. GPT creates the background once; edit text and logos in the form without regenerating the image.
+        </p>
         <p className="mt-1 text-xs font-medium text-slate-400">Current: {currentSettingsSummary}</p>
       </div>
 
@@ -201,7 +212,7 @@ export const ChatAssistant = ({ settings, draftPrompt, embedded = false, onPatch
             onClick={onGenerate}
             className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
           >
-            Generate Banner
+            {generateButtonLabel}
           </button>
         </div>
 

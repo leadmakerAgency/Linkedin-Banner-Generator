@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { ChatAssistant } from "@/components/ChatAssistant";
@@ -13,6 +13,10 @@ const INITIAL_VALUES: BannerFormValues = {
   companyDescription: "",
   companyNameFontStyle: "inter",
   companyDescriptionFontStyle: "inter",
+  companyNameFontSize: 74,
+  companyDescriptionFontSize: 24,
+  companyNameFontWeight: "700",
+  companyDescriptionFontWeight: "500",
   companyNameColorMode: "auto",
   companyNameTextColor: "#FFFFFF",
   companyDescriptionColorMode: "auto",
@@ -21,6 +25,8 @@ const INITIAL_VALUES: BannerFormValues = {
   primaryBrandColor: "#1D4ED8",
   secondaryBrandColor: "#0F172A",
   phoneNumber: "",
+  phoneIconOffsetX: 0,
+  phoneIconOffsetY: 0,
   stylePreset: "corporate",
   imageModel: "gpt-image-1"
 };
@@ -32,6 +38,10 @@ const DEFAULT_GENERATION_VALUES: Pick<
   | "phoneNumber"
   | "companyNameFontStyle"
   | "companyDescriptionFontStyle"
+  | "companyNameFontSize"
+  | "companyDescriptionFontSize"
+  | "companyNameFontWeight"
+  | "companyDescriptionFontWeight"
   | "companyNameColorMode"
   | "companyNameTextColor"
   | "companyDescriptionColorMode"
@@ -43,6 +53,10 @@ const DEFAULT_GENERATION_VALUES: Pick<
   phoneNumber: "+1 555 010 234",
   companyNameFontStyle: "inter",
   companyDescriptionFontStyle: "inter",
+  companyNameFontSize: 74,
+  companyDescriptionFontSize: 24,
+  companyNameFontWeight: "700",
+  companyDescriptionFontWeight: "500",
   companyNameColorMode: "auto",
   companyNameTextColor: "#FFFFFF",
   companyDescriptionColorMode: "auto",
@@ -55,13 +69,20 @@ const INITIAL_FILES: BannerFiles = {
   secondaryLogo: null
 };
 
+const stripQuery = (url: string): string => {
+  return url.split("?")[0] ?? url;
+};
+
 const HomePage = () => {
   const [values, setValues] = useState<BannerFormValues>(INITIAL_VALUES);
   const [files, setFiles] = useState<BannerFiles>(INITIAL_FILES);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoadingBackground, setIsLoadingBackground] = useState(false);
+  const [isLoadingOverlay, setIsLoadingOverlay] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const overlayRequestId = useRef(0);
 
   const generateNonce = (): string => {
     if (typeof window !== "undefined" && window.crypto && "randomUUID" in window.crypto) {
@@ -76,6 +97,10 @@ const HomePage = () => {
     `Company description: ${values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription}.`,
     `Company name font: ${values.companyNameFontStyle || DEFAULT_GENERATION_VALUES.companyNameFontStyle}.`,
     `Description font: ${values.companyDescriptionFontStyle || DEFAULT_GENERATION_VALUES.companyDescriptionFontStyle}.`,
+    `Company name font size: ${values.companyNameFontSize || DEFAULT_GENERATION_VALUES.companyNameFontSize}px.`,
+    `Description font size: ${values.companyDescriptionFontSize || DEFAULT_GENERATION_VALUES.companyDescriptionFontSize}px.`,
+    `Company name font weight: ${values.companyNameFontWeight || DEFAULT_GENERATION_VALUES.companyNameFontWeight}.`,
+    `Description font weight: ${values.companyDescriptionFontWeight || DEFAULT_GENERATION_VALUES.companyDescriptionFontWeight}.`,
     values.companyNameColorMode === "auto"
       ? "Company name text color: Auto (AI chooses the best fitting contrast color based on the generated design)."
       : `Company name text color (manual): ${values.companyNameTextColor || DEFAULT_GENERATION_VALUES.companyNameTextColor}.`,
@@ -89,54 +114,64 @@ const HomePage = () => {
     `Primary brand color: ${values.primaryBrandColor}.`,
     `Secondary brand color: ${values.secondaryBrandColor}.`,
     `Phone number: ${values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber}.`,
+    `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
     `Style preset: ${values.stylePreset}.`,
     `Image model: ${values.imageModel}.`,
     "Make it professional, clean, and suitable for 1584x396 LinkedIn cover dimensions."
   ].join(" ");
 
-  const handleBuildFormData = (revisionAction?: RevisionAction, forceFresh?: boolean): FormData => {
-    const companyName = values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
-    const companyDescription = values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
-    const phoneNumber = values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
+  const handleBuildFormData = useCallback(
+    (revisionAction?: RevisionAction, forceFresh?: boolean): FormData => {
+      const companyName = values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
+      const companyDescription = values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
+      const phoneNumber = values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
 
-    const formData = new FormData();
-    formData.set("bannerType", values.bannerType);
-    formData.set("companyName", companyName);
-    formData.set("companyDescription", companyDescription);
-    formData.set("companyNameFontStyle", values.companyNameFontStyle);
-    formData.set("companyDescriptionFontStyle", values.companyDescriptionFontStyle);
-    formData.set("companyNameColorMode", values.companyNameColorMode);
-    formData.set("companyNameTextColor", values.companyNameTextColor);
-    formData.set("companyDescriptionColorMode", values.companyDescriptionColorMode);
-    formData.set("companyDescriptionTextColor", values.companyDescriptionTextColor);
-    formData.set("companyPageType", values.companyPageType);
-    formData.set("primaryBrandColor", values.primaryBrandColor);
-    formData.set("secondaryBrandColor", values.secondaryBrandColor);
-    formData.set("phoneNumber", phoneNumber);
-    formData.set("stylePreset", values.stylePreset);
-    formData.set("imageModel", values.imageModel);
-    if (files.primaryLogo) {
-      formData.set("primaryLogo", files.primaryLogo);
-    }
-    if (files.secondaryLogo) {
-      formData.set("secondaryLogo", files.secondaryLogo);
-    }
-    if (revisionAction) {
-      formData.set("revisionAction", revisionAction);
-    }
-    if (forceFresh) {
-      formData.set("regenerateNonce", generateNonce());
-    }
+      const formData = new FormData();
+      formData.set("bannerType", values.bannerType);
+      formData.set("companyName", companyName);
+      formData.set("companyDescription", companyDescription);
+      formData.set("companyNameFontStyle", values.companyNameFontStyle);
+      formData.set("companyDescriptionFontStyle", values.companyDescriptionFontStyle);
+      formData.set("companyNameFontSize", String(values.companyNameFontSize));
+      formData.set("companyDescriptionFontSize", String(values.companyDescriptionFontSize));
+      formData.set("companyNameFontWeight", values.companyNameFontWeight);
+      formData.set("companyDescriptionFontWeight", values.companyDescriptionFontWeight);
+      formData.set("companyNameColorMode", values.companyNameColorMode);
+      formData.set("companyNameTextColor", values.companyNameTextColor);
+      formData.set("companyDescriptionColorMode", values.companyDescriptionColorMode);
+      formData.set("companyDescriptionTextColor", values.companyDescriptionTextColor);
+      formData.set("companyPageType", values.companyPageType);
+      formData.set("primaryBrandColor", values.primaryBrandColor);
+      formData.set("secondaryBrandColor", values.secondaryBrandColor);
+      formData.set("phoneNumber", phoneNumber);
+      formData.set("phoneIconOffsetX", String(values.phoneIconOffsetX));
+      formData.set("phoneIconOffsetY", String(values.phoneIconOffsetY));
+      formData.set("stylePreset", values.stylePreset);
+      formData.set("imageModel", values.imageModel);
+      if (files.primaryLogo) {
+        formData.set("primaryLogo", files.primaryLogo);
+      }
+      if (files.secondaryLogo) {
+        formData.set("secondaryLogo", files.secondaryLogo);
+      }
+      if (revisionAction) {
+        formData.set("revisionAction", revisionAction);
+      }
+      if (forceFresh) {
+        formData.set("regenerateNonce", generateNonce());
+      }
 
-    return formData;
-  };
+      return formData;
+    },
+    [values, files]
+  );
 
-  const handleRequest = async (
-    endpoint: "/api/generate" | "/api/revise",
+  const handleBackgroundRequest = async (
+    endpoint: "/api/generate-background" | "/api/revise",
     revisionAction?: RevisionAction,
     forceFresh?: boolean
   ) => {
-    setIsLoading(true);
+    setIsLoadingBackground(true);
     setLoadingProgress(8);
     setErrorMessage(null);
     const progressTimer = window.setInterval(() => {
@@ -154,35 +189,38 @@ const HomePage = () => {
         method: "POST",
         body: handleBuildFormData(revisionAction, forceFresh)
       });
-      const data = (await response.json()) as { imageUrl?: string; error?: string };
+      const data = (await response.json()) as { backgroundUrl?: string; imageUrl?: string; error?: string };
 
-      if (!response.ok || !data.imageUrl) {
-        setErrorMessage(data.error ?? "Banner generation failed.");
+      if (!response.ok || (!data.backgroundUrl && !data.imageUrl)) {
+        setErrorMessage(data.error ?? "Background generation failed.");
         return;
       }
 
+      const nextBackground = stripQuery(data.backgroundUrl ?? data.imageUrl ?? "");
+      setBackgroundUrl(nextBackground);
+      setPreviewUrl(null);
+      setIsLoadingOverlay(true);
       setLoadingProgress(100);
-      setImageUrl(data.imageUrl);
     } catch {
       setErrorMessage("Unable to reach generator API. Please retry.");
     } finally {
       window.clearInterval(progressTimer);
       setLoadingProgress(100);
       window.setTimeout(() => setLoadingProgress(0), 450);
-      setIsLoading(false);
+      setIsLoadingBackground(false);
     }
   };
 
-  const handleGenerate = () => {
-    void handleRequest("/api/generate", undefined, true);
+  const handleGenerateBackground = () => {
+    void handleBackgroundRequest("/api/generate-background", undefined, true);
   };
 
-  const handleRegenerate = () => {
-    void handleRequest("/api/generate", undefined, true);
+  const handleRegenerateBackground = () => {
+    void handleBackgroundRequest("/api/generate-background", undefined, true);
   };
 
-  const handleRevision = (action: RevisionAction) => {
-    void handleRequest("/api/revise", action);
+  const handleRevisionBackground = (action: RevisionAction) => {
+    void handleBackgroundRequest("/api/revise", action, false);
   };
 
   const handlePatchFromChat = (patch: Partial<BannerFormValues>) => {
@@ -191,6 +229,57 @@ const HomePage = () => {
       ...patch
     }));
   };
+
+  useEffect(() => {
+    if (!backgroundUrl) {
+      setIsLoadingOverlay(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const requestId = overlayRequestId.current + 1;
+      overlayRequestId.current = requestId;
+      setIsLoadingOverlay(true);
+      setErrorMessage(null);
+
+      const formData = handleBuildFormData();
+      formData.set("backgroundUrl", stripQuery(backgroundUrl));
+
+      void (async () => {
+        try {
+          const response = await fetch("/api/render-overlay", {
+            method: "POST",
+            body: formData
+          });
+          const data = (await response.json()) as { imageUrl?: string; error?: string };
+
+          if (overlayRequestId.current !== requestId) {
+            return;
+          }
+
+          if (!response.ok || !data.imageUrl) {
+            setErrorMessage(data.error ?? "Failed to apply text and logos.");
+            return;
+          }
+
+          setPreviewUrl(data.imageUrl);
+        } catch {
+          if (overlayRequestId.current === requestId) {
+            setErrorMessage("Unable to render overlay. Please retry.");
+          }
+        } finally {
+          if (overlayRequestId.current === requestId) {
+            setIsLoadingOverlay(false);
+          }
+        }
+      })();
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [backgroundUrl, values, files, handleBuildFormData]);
+
+  const displayUrl = previewUrl ?? backgroundUrl;
+  const hasBackground = Boolean(backgroundUrl);
 
   return (
     <main className="min-h-screen px-4 py-8 md:px-8">
@@ -224,18 +313,22 @@ const HomePage = () => {
               draftPrompt={autoChatPrompt}
               embedded
               onPatchSettings={handlePatchFromChat}
-              onGenerate={handleGenerate}
+              onGenerate={handleGenerateBackground}
+              generateButtonLabel={hasBackground ? "Regenerate background (GPT)" : "Generate background"}
             />
           </div>
         </section>
 
         <section>
           <BannerPreview
-            imageUrl={imageUrl}
-            isLoading={isLoading}
+            displayUrl={displayUrl}
+            hasBackground={hasBackground}
+            isLoadingBackground={isLoadingBackground}
+            isLoadingOverlay={isLoadingOverlay}
             loadingProgress={loadingProgress}
-            onRegenerate={handleRegenerate}
-            onRevision={handleRevision}
+            onRegenerateBackground={handleRegenerateBackground}
+            onRevisionBackground={handleRevisionBackground}
+            downloadUrl={previewUrl}
           />
 
           {errorMessage ? (
