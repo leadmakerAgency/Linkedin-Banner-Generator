@@ -96,5 +96,20 @@ export interface GenerateResponse {
   filename: string;
 }
 
+/** Pixel bounds in 1584×396 space for draggable handles (matches last server composite). */
+export type LayoutElementRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+export type LayoutOverlayPayload = {
+  primaryLogo: LayoutElementRect | null;
+  secondaryLogo: LayoutElementRect | null;
+  textBlock: LayoutElementRect;
+  phoneGroup: LayoutElementRect | null;
+};
+
 /** Client workflow: GPT background first, then editable overlay (no GPT on overlay edits). */
 export type GenerationStage = "idle" | "generatingBackground" | "editingOverlay" | "exporting";

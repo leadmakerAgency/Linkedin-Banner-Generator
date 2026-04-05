@@ -1,6 +1,7 @@
 "use client";
 import { BannerLayoutEditor } from "@/components/BannerLayoutEditor";
-import type { BannerFormValues, RevisionAction } from "@/types/banner";
+import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
+import type { BannerFormValues, LayoutOverlayPayload, RevisionAction } from "@/types/banner";
 
 interface BannerPreviewProps {
   /** Merged preview when overlay has rendered; may be background-only until first overlay completes. */
@@ -17,6 +18,10 @@ interface BannerPreviewProps {
   onLayoutDeltaChange: (patch: Partial<BannerFormValues>) => void;
   onResetLayout: () => void;
   layoutOverlayActive: boolean;
+  layoutOverlay: LayoutOverlayPayload | null;
+  onLayoutDragNudge: (group: LayoutDragGroup, dxBanner: number, dyBanner: number) => void;
+  hasPrimaryLogo: boolean;
+  hasSecondaryLogo: boolean;
 }
 
 const revisionActions: Array<{ value: RevisionAction; label: string }> = [
@@ -39,7 +44,11 @@ export const BannerPreview = ({
   layoutValues,
   onLayoutDeltaChange,
   onResetLayout,
-  layoutOverlayActive
+  layoutOverlayActive,
+  layoutOverlay,
+  onLayoutDragNudge,
+  hasPrimaryLogo,
+  hasSecondaryLogo
 }: BannerPreviewProps) => {
   return (
     <section className="rounded-2xl border border-slate-800/90 bg-slate-900/75 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl" aria-live="polite">
@@ -80,10 +89,17 @@ export const BannerPreview = ({
               key={displayUrl}
               src={displayUrl}
               alt="LinkedIn banner preview"
-              className="pointer-events-none h-full w-full object-cover"
+              className="pointer-events-none h-full w-full object-contain"
             />
             {layoutOverlayActive ? (
-              <BannerLayoutEditor values={layoutValues} onLayoutDeltaChange={onLayoutDeltaChange} />
+              <BannerLayoutEditor
+                values={layoutValues}
+                layoutOverlay={layoutOverlay}
+                onLayoutDeltaChange={onLayoutDeltaChange}
+                onLayoutDragNudge={onLayoutDragNudge}
+                hasPrimaryLogo={hasPrimaryLogo}
+                hasSecondaryLogo={hasSecondaryLogo}
+              />
             ) : null}
           </>
         ) : (

@@ -37,7 +37,8 @@ export const POST = async (request: Request) => {
 
     return NextResponse.json({
       imageUrl: `${output.imageUrl}?t=${Date.now()}`,
-      filename: output.filename
+      filename: output.filename,
+      layoutOverlay: output.layoutOverlay
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to render overlay.";

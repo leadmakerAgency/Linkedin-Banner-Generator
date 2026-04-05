@@ -21,6 +21,8 @@ import {
   BANNER_HEIGHT,
   BANNER_WIDTH,
   CompanyPageType,
+  LayoutElementRect,
+  LayoutOverlayPayload,
   RevisionAction,
   StylePresetId
 } from "@/types/banner";
@@ -156,7 +158,30 @@ const parseOptionalString = (value: FormDataEntryValue | null): string | undefin
 export interface GeneratedBannerResult {
   filename: string;
   imageUrl: string;
+  /** Present when the response includes a composed overlay (logos + text + phone). */
+  layoutOverlay?: LayoutOverlayPayload;
 }
+
+const unionLayoutRects = (rects: LayoutElementRect[], padding: number): LayoutElementRect => {
+  if (rects.length === 0) {
+    return { left: 0, top: 0, width: 1, height: 1 };
+  }
+  let minL = Infinity;
+  let minT = Infinity;
+  let maxR = -Infinity;
+  let maxB = -Infinity;
+  for (const r of rects) {
+    minL = Math.min(minL, r.left);
+    minT = Math.min(minT, r.top);
+    maxR = Math.max(maxR, r.left + r.width);
+    maxB = Math.max(maxB, r.top + r.height);
+  }
+  const left = Math.max(0, minL - padding);
+  const top = Math.max(0, minT - padding);
+  const width = Math.min(BANNER_WIDTH - left, maxR - minL + padding * 2);
+  const height = Math.min(BANNER_HEIGHT - top, maxB - minT + padding * 2);
+  return { left, top, width: Math.max(1, width), height: Math.max(1, height) };
+};
 
 /** Resize/crop AI output to banner size and remove transparency. */
 export const normalizeBackgroundBuffer = async (buffer: Buffer, flattenColor: string): Promise<Buffer> => {
@@ -267,7 +292,7 @@ export const overlayBrandElements = async (
   patchLogoScale: number,
   primaryLogo?: File | null,
   secondaryLogo?: File | null
-): Promise<Buffer> => {
+): Promise<{ buffer: Buffer; layoutOverlay: LayoutOverlayPayload }> => {
   const maxLogoWidth = Math.round(LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
   const maxLogoHeight = Math.round(LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
   const margin = LAYOUT_MARGIN;
@@ -278,19 +303,23 @@ export const overlayBrandElements = async (
   const overlays: sharp.OverlayOptions[] = [];
   let primaryBuffer: Buffer | undefined;
   let primaryWidth = 0;
+  let primaryHeight = 0;
   let secondaryBuffer: Buffer | undefined;
   let secondaryWidth = 0;
+  let secondaryHeight = 0;
 
   if (primaryLogo) {
     primaryBuffer = await resizeLogoBuffer(Buffer.from(await primaryLogo.arrayBuffer()), maxLogoWidth, maxLogoHeight);
     const meta = await sharp(primaryBuffer).metadata();
     primaryWidth = meta.width ?? 0;
+    primaryHeight = meta.height ?? 0;
   }
 
   if (secondaryLogo) {
     secondaryBuffer = await resizeLogoBuffer(Buffer.from(await secondaryLogo.arrayBuffer()), LAYOUT_SECONDARY_LOGO_BOX, LAYOUT_SECONDARY_LOGO_BOX);
     const meta = await sharp(secondaryBuffer).metadata();
     secondaryWidth = meta.width ?? 0;
+    secondaryHeight = meta.height ?? 0;
   }
 
   const primaryLeft = margin + values.layoutPrimaryLogoDeltaX;
@@ -345,6 +374,8 @@ export const overlayBrandElements = async (
 
   const textMaxWidth = Math.max(180, BANNER_WIDTH - currentLeft - 140);
 
+  const textRectsForUnion: LayoutElementRect[] = [];
+
   const nameRaster = await renderTextRaster({
     text: companyNameRaw,
     fontStyle: values.companyNameFontStyle,
@@ -357,6 +388,12 @@ export const overlayBrandElements = async (
   if (nameRaster) {
     const nameTop = Math.max(0, Math.round(titleY - companyNameFontSize * 0.72));
     overlays.push({ input: nameRaster.buffer, left: currentLeft, top: nameTop });
+    textRectsForUnion.push({
+      left: currentLeft,
+      top: nameTop,
+      width: nameRaster.width,
+      height: nameRaster.height
+    });
   }
 
   const line0 = descriptionLines[0] ?? "";
@@ -375,6 +412,12 @@ export const overlayBrandElements = async (
   if (desc0Raster) {
     const top0 = Math.max(0, Math.round(descriptionStartY - companyDescriptionFontSize * 0.72));
     overlays.push({ input: desc0Raster.buffer, left: currentLeft, top: top0 });
+    textRectsForUnion.push({
+      left: currentLeft,
+      top: top0,
+      width: desc0Raster.width,
+      height: desc0Raster.height
+    });
   }
 
   const desc1Raster = line1
@@ -391,42 +434,84 @@ export const overlayBrandElements = async (
   if (desc1Raster) {
     const top1 = Math.max(0, Math.round(descriptionStartY + descriptionLineGap - companyDescriptionFontSize * 0.72));
     overlays.push({ input: desc1Raster.buffer, left: currentLeft, top: top1 });
+    textRectsForUnion.push({
+      left: currentLeft,
+      top: top1,
+      width: desc1Raster.width,
+      height: desc1Raster.height
+    });
   }
+
+  const textBlockRect =
+    textRectsForUnion.length > 0
+      ? unionLayoutRects(textRectsForUnion, 6)
+      : ({
+          left: currentLeft,
+          top: Math.max(0, Math.round(titleY - companyNameFontSize * 0.72)),
+          width: Math.min(textMaxWidth, 400),
+          height: Math.round(companyNameFontSize + companyDescriptionFontSize * 2.8)
+        } satisfies LayoutElementRect);
 
   const phoneFontSize = 22;
   const iconSize = 30;
-  const phoneAnchorX = BANNER_WIDTH - 18 + values.layoutPhoneGroupDeltaX;
-  const phoneBaselineY = BANNER_HEIGHT - 8 + values.layoutPhoneGroupDeltaY;
-  const approxPhoneWidth = Math.max(90, Math.round(phoneRaw.length * phoneFontSize * 0.55));
-  const iconGap = 4;
-  const baseIconX = phoneAnchorX - approxPhoneWidth - iconSize - iconGap;
-  const baseIconY = phoneBaselineY - iconSize + 11;
-  const iconX = Math.min(BANNER_WIDTH - iconSize - 2, Math.max(2, baseIconX + values.phoneIconOffsetX));
-  const iconY = Math.min(BANNER_HEIGHT - iconSize - 2, Math.max(2, baseIconY + values.phoneIconOffsetY));
-  const phoneTextY = iconY + iconSize / 2;
+  const iconGap = 8;
+  const phoneRightX = BANNER_WIDTH - 18 + values.layoutPhoneGroupDeltaX;
+  const phoneRowCenterY = BANNER_HEIGHT - 22 + values.layoutPhoneGroupDeltaY;
 
-  const phoneIconSvg = `
+  let phoneGroupRect: LayoutElementRect | null = null;
+
+  if (phoneRaw) {
+    const phoneRaster = await renderTextRaster({
+      text: phoneRaw,
+      fontStyle: values.companyNameFontStyle,
+      fontWeight: "500",
+      fontSizePx: phoneFontSize,
+      colorHex: phoneTextColor,
+      maxWidth: 480,
+      align: "right"
+    });
+
+    let phoneLeft = 0;
+    let phoneTop = 0;
+    let phoneW = 0;
+    let phoneH = 0;
+
+    if (phoneRaster) {
+      phoneW = phoneRaster.width;
+      phoneH = phoneRaster.height;
+      phoneLeft = Math.max(0, phoneRightX - phoneW);
+      phoneTop = Math.max(0, Math.round(phoneRowCenterY - phoneH / 2));
+    }
+
+    let iconX =
+      (phoneRaster ? phoneLeft : phoneRightX) - iconGap - iconSize + values.phoneIconOffsetX;
+    let iconY = Math.round(phoneRowCenterY - iconSize / 2) + values.phoneIconOffsetY;
+
+    if (!phoneRaster) {
+      iconX = phoneRightX - iconSize + values.phoneIconOffsetX;
+    }
+
+    iconX = Math.min(BANNER_WIDTH - iconSize - 2, Math.max(2, iconX));
+    iconY = Math.min(BANNER_HEIGHT - iconSize - 2, Math.max(2, iconY));
+
+    const phoneIconSvg = `
     <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
     </svg>
   `;
-  overlays.push({ input: Buffer.from(phoneIconSvg), left: iconX, top: iconY });
+    overlays.push({ input: Buffer.from(phoneIconSvg), left: iconX, top: iconY });
 
-  const phoneRaster = phoneRaw
-    ? await renderTextRaster({
-        text: phoneRaw,
-        fontStyle: values.companyNameFontStyle,
-        fontWeight: "500",
-        fontSizePx: phoneFontSize,
-        colorHex: phoneTextColor,
-        maxWidth: 420,
-        align: "right"
-      })
-    : null;
-  if (phoneRaster) {
-    const phoneLeft = Math.max(0, phoneAnchorX - phoneRaster.width);
-    const phoneTop = Math.max(0, Math.round(phoneTextY - phoneRaster.height / 2));
-    overlays.push({ input: phoneRaster.buffer, left: phoneLeft, top: phoneTop });
+    if (phoneRaster) {
+      overlays.push({ input: phoneRaster.buffer, left: phoneLeft, top: phoneTop });
+    }
+
+    const iconRect: LayoutElementRect = { left: iconX, top: iconY, width: iconSize, height: iconSize };
+    if (phoneRaster) {
+      const textRect: LayoutElementRect = { left: phoneLeft, top: phoneTop, width: phoneW, height: phoneH };
+      phoneGroupRect = unionLayoutRects([iconRect, textRect], 4);
+    } else {
+      phoneGroupRect = unionLayoutRects([iconRect], 4);
+    }
   }
 
   const secondaryLogoLeft = BANNER_WIDTH - secondaryWidth - LAYOUT_SECONDARY_LOGO_RIGHT_PAD + values.layoutSecondaryLogoDeltaX;
@@ -436,7 +521,26 @@ export const overlayBrandElements = async (
     overlays.push({ input: secondaryBuffer, left: secondaryLogoLeft, top: secondaryLogoTop });
   }
 
-  return sharp(bannerBuffer).composite(overlays).flatten({ background: values.secondaryBrandColor }).png().toBuffer();
+  const layoutOverlay: LayoutOverlayPayload = {
+    primaryLogo:
+      primaryBuffer && primaryWidth > 0 && primaryHeight > 0
+        ? { left: primaryLeft, top: primaryTop, width: primaryWidth, height: primaryHeight }
+        : null,
+    secondaryLogo:
+      secondaryBuffer && secondaryWidth > 0 && secondaryHeight > 0
+        ? { left: secondaryLogoLeft, top: secondaryLogoTop, width: secondaryWidth, height: secondaryHeight }
+        : null,
+    textBlock: textBlockRect,
+    phoneGroup: phoneGroupRect
+  };
+
+  const buffer = await sharp(bannerBuffer)
+    .composite(overlays)
+    .flatten({ background: values.secondaryBrandColor })
+    .png()
+    .toBuffer();
+
+  return { buffer, layoutOverlay };
 };
 
 /** GPT image only; saved as PNG under public/generated. Does not composite logos/text. */
@@ -474,11 +578,12 @@ export const runOverlayRender = async (
 ): Promise<GeneratedBannerResult> => {
   const buffer = await readBackgroundBufferFromPublicUrl(backgroundPublicUrl);
   const patch = getRevisionPatch(undefined);
-  const pngBuffer = await overlayBrandElements(buffer, values, patch.logoScale, primaryLogo, secondaryLogo);
+  const { buffer: pngBuffer, layoutOverlay } = await overlayBrandElements(buffer, values, patch.logoScale, primaryLogo, secondaryLogo);
   const stored = await saveOutputPng(pngBuffer);
   return {
     filename: stored.filename,
-    imageUrl: stored.publicUrl
+    imageUrl: stored.publicUrl,
+    layoutOverlay
   };
 };
 
@@ -561,11 +666,18 @@ export const runBannerGeneration = async (
 
   const baseImageBuffer = await generateCreativeBaseImage(prompt, values.regenerateNonce, values.imageModel);
   const basePngBuffer = await normalizeBackgroundBuffer(baseImageBuffer, values.secondaryBrandColor);
-  const pngBuffer = await overlayBrandElements(basePngBuffer, values, patch.logoScale, primaryLogo, secondaryLogo);
+  const { buffer: pngBuffer, layoutOverlay } = await overlayBrandElements(
+    basePngBuffer,
+    values,
+    patch.logoScale,
+    primaryLogo,
+    secondaryLogo
+  );
 
   const stored = await saveOutputPng(pngBuffer);
   return {
     filename: stored.filename,
-    imageUrl: stored.publicUrl
+    imageUrl: stored.publicUrl,
+    layoutOverlay
   };
 };

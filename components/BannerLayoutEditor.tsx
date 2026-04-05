@@ -18,7 +18,8 @@ import {
   LAYOUT_TEXT_BLOCK_TOP,
   LAYOUT_TEXT_BLOCK_WIDTH
 } from "@/lib/bannerLayoutConstants";
-import type { BannerFormValues } from "@/types/banner";
+import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
+import type { BannerFormValues, LayoutElementRect, LayoutOverlayPayload } from "@/types/banner";
 import { BANNER_WIDTH } from "@/types/banner";
 
 const clampDelta = (value: number): number => Math.max(-400, Math.min(400, value));
@@ -26,12 +27,30 @@ const clampDelta = (value: number): number => Math.max(-400, Math.min(400, value
 const handleClass =
   "pointer-events-auto absolute z-10 box-border cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
 
+const rectToStyle = (rect: LayoutElementRect, scale: number) => ({
+  left: rect.left * scale,
+  top: rect.top * scale,
+  width: rect.width * scale,
+  height: rect.height * scale
+});
+
 interface BannerLayoutEditorProps {
   values: BannerFormValues;
+  layoutOverlay: LayoutOverlayPayload | null;
   onLayoutDeltaChange: (patch: Partial<BannerFormValues>) => void;
+  onLayoutDragNudge: (group: LayoutDragGroup, dxBanner: number, dyBanner: number) => void;
+  hasPrimaryLogo: boolean;
+  hasSecondaryLogo: boolean;
 }
 
-export const BannerLayoutEditor = ({ values, onLayoutDeltaChange }: BannerLayoutEditorProps) => {
+export const BannerLayoutEditor = ({
+  values,
+  layoutOverlay,
+  onLayoutDeltaChange,
+  onLayoutDragNudge,
+  hasPrimaryLogo,
+  hasSecondaryLogo
+}: BannerLayoutEditorProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLDivElement>(null);
   const secondaryRef = useRef<HTMLDivElement>(null);
@@ -56,100 +75,144 @@ export const BannerLayoutEditor = ({ values, onLayoutDeltaChange }: BannerLayout
     return () => observer.disconnect();
   }, []);
 
-  const handlePrimaryStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      onLayoutDeltaChange({
-        layoutPrimaryLogoDeltaX: clampDelta(values.layoutPrimaryLogoDeltaX + Math.round(data.x / scale)),
-        layoutPrimaryLogoDeltaY: clampDelta(values.layoutPrimaryLogoDeltaY + Math.round(data.y / scale))
-      });
-    },
-    [onLayoutDeltaChange, scale, values.layoutPrimaryLogoDeltaX, values.layoutPrimaryLogoDeltaY]
-  );
-
-  const handleSecondaryStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      onLayoutDeltaChange({
-        layoutSecondaryLogoDeltaX: clampDelta(values.layoutSecondaryLogoDeltaX + Math.round(data.x / scale)),
-        layoutSecondaryLogoDeltaY: clampDelta(values.layoutSecondaryLogoDeltaY + Math.round(data.y / scale))
-      });
-    },
-    [onLayoutDeltaChange, scale, values.layoutSecondaryLogoDeltaX, values.layoutSecondaryLogoDeltaY]
-  );
-
-  const handleTextStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      onLayoutDeltaChange({
-        layoutTextBlockDeltaX: clampDelta(values.layoutTextBlockDeltaX + Math.round(data.x / scale)),
-        layoutTextBlockDeltaY: clampDelta(values.layoutTextBlockDeltaY + Math.round(data.y / scale))
-      });
-    },
-    [onLayoutDeltaChange, scale, values.layoutTextBlockDeltaX, values.layoutTextBlockDeltaY]
-  );
-
-  const handlePhoneStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      onLayoutDeltaChange({
-        layoutPhoneGroupDeltaX: clampDelta(values.layoutPhoneGroupDeltaX + Math.round(data.x / scale)),
-        layoutPhoneGroupDeltaY: clampDelta(values.layoutPhoneGroupDeltaY + Math.round(data.y / scale))
-      });
-    },
-    [onLayoutDeltaChange, scale, values.layoutPhoneGroupDeltaX, values.layoutPhoneGroupDeltaY]
-  );
-
   const s = scale;
+
+  const primaryRect: LayoutElementRect | null = !hasPrimaryLogo
+    ? null
+    : layoutOverlay
+      ? layoutOverlay.primaryLogo
+      : {
+          left: LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX,
+          top: LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY,
+          width: LAYOUT_PRIMARY_LOGO_BOX,
+          height: LAYOUT_PRIMARY_LOGO_BOX
+        };
+
+  const secondaryRect: LayoutElementRect | null = !hasSecondaryLogo
+    ? null
+    : layoutOverlay
+      ? layoutOverlay.secondaryLogo
+      : {
+          left: LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX,
+          top: LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY,
+          width: LAYOUT_SECONDARY_LOGO_BOX,
+          height: LAYOUT_SECONDARY_LOGO_BOX
+        };
+
+  const textRect: LayoutElementRect = layoutOverlay?.textBlock ?? {
+    left: LAYOUT_TEXT_BLOCK_LEFT + values.layoutTextBlockDeltaX,
+    top: LAYOUT_TEXT_BLOCK_TOP + values.layoutTextBlockDeltaY,
+    width: LAYOUT_TEXT_BLOCK_WIDTH,
+    height: LAYOUT_TEXT_BLOCK_HEIGHT
+  };
+
+  const phoneRect: LayoutElementRect | null = layoutOverlay
+    ? layoutOverlay.phoneGroup
+    : {
+        left: LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX,
+        top: LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY,
+        width: LAYOUT_PHONE_REGION_W,
+        height: LAYOUT_PHONE_REGION_H
+      };
+
+  const commitPrimaryStop = useCallback(
+    (_e: DraggableEvent, data: DraggableData) => {
+      const dx = Math.round(data.x / s);
+      const dy = Math.round(data.y / s);
+      onLayoutDeltaChange({
+        layoutPrimaryLogoDeltaX: clampDelta(values.layoutPrimaryLogoDeltaX + dx),
+        layoutPrimaryLogoDeltaY: clampDelta(values.layoutPrimaryLogoDeltaY + dy)
+      });
+      onLayoutDragNudge("primary", dx, dy);
+    },
+    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutPrimaryLogoDeltaX, values.layoutPrimaryLogoDeltaY]
+  );
+
+  const commitSecondaryStop = useCallback(
+    (_e: DraggableEvent, data: DraggableData) => {
+      const dx = Math.round(data.x / s);
+      const dy = Math.round(data.y / s);
+      onLayoutDeltaChange({
+        layoutSecondaryLogoDeltaX: clampDelta(values.layoutSecondaryLogoDeltaX + dx),
+        layoutSecondaryLogoDeltaY: clampDelta(values.layoutSecondaryLogoDeltaY + dy)
+      });
+      onLayoutDragNudge("secondary", dx, dy);
+    },
+    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutSecondaryLogoDeltaX, values.layoutSecondaryLogoDeltaY]
+  );
+
+  const commitTextStop = useCallback(
+    (_e: DraggableEvent, data: DraggableData) => {
+      const dx = Math.round(data.x / s);
+      const dy = Math.round(data.y / s);
+      onLayoutDeltaChange({
+        layoutTextBlockDeltaX: clampDelta(values.layoutTextBlockDeltaX + dx),
+        layoutTextBlockDeltaY: clampDelta(values.layoutTextBlockDeltaY + dy)
+      });
+      onLayoutDragNudge("text", dx, dy);
+    },
+    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutTextBlockDeltaX, values.layoutTextBlockDeltaY]
+  );
+
+  const commitPhoneStop = useCallback(
+    (_e: DraggableEvent, data: DraggableData) => {
+      const dx = Math.round(data.x / s);
+      const dy = Math.round(data.y / s);
+      onLayoutDeltaChange({
+        layoutPhoneGroupDeltaX: clampDelta(values.layoutPhoneGroupDeltaX + dx),
+        layoutPhoneGroupDeltaY: clampDelta(values.layoutPhoneGroupDeltaY + dy)
+      });
+      onLayoutDragNudge("phone", dx, dy);
+    },
+    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutPhoneGroupDeltaX, values.layoutPhoneGroupDeltaY]
+  );
 
   return (
     <div ref={containerRef} className="pointer-events-none absolute inset-0">
-      <Draggable
-        key={`p-${values.layoutPrimaryLogoDeltaX}-${values.layoutPrimaryLogoDeltaY}`}
-        nodeRef={primaryRef}
-        bounds="parent"
-        defaultPosition={{ x: 0, y: 0 }}
-        onStop={handlePrimaryStop}
-      >
-        <div
-          ref={primaryRef}
-          role="button"
-          tabIndex={0}
-          aria-label="Drag primary logo"
-          className={handleClass}
-          style={{
-            left: (LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX) * s,
-            top: (LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY) * s,
-            width: LAYOUT_PRIMARY_LOGO_BOX * s,
-            height: LAYOUT_PRIMARY_LOGO_BOX * s
-          }}
-        />
-      </Draggable>
+      {primaryRect ? (
+        <Draggable
+          key={`p-${values.layoutPrimaryLogoDeltaX}-${values.layoutPrimaryLogoDeltaY}`}
+          nodeRef={primaryRef}
+          bounds="parent"
+          defaultPosition={{ x: 0, y: 0 }}
+          onStop={commitPrimaryStop}
+        >
+          <div
+            ref={primaryRef}
+            role="button"
+            tabIndex={0}
+            aria-label="Drag primary logo"
+            className={handleClass}
+            style={rectToStyle(primaryRect, s)}
+          />
+        </Draggable>
+      ) : null}
 
-      <Draggable
-        key={`s-${values.layoutSecondaryLogoDeltaX}-${values.layoutSecondaryLogoDeltaY}`}
-        nodeRef={secondaryRef}
-        bounds="parent"
-        defaultPosition={{ x: 0, y: 0 }}
-        onStop={handleSecondaryStop}
-      >
-        <div
-          ref={secondaryRef}
-          role="button"
-          tabIndex={0}
-          aria-label="Drag secondary logo"
-          className={handleClass}
-          style={{
-            left: (LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX) * s,
-            top: (LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY) * s,
-            width: LAYOUT_SECONDARY_LOGO_BOX * s,
-            height: LAYOUT_SECONDARY_LOGO_BOX * s
-          }}
-        />
-      </Draggable>
+      {secondaryRect ? (
+        <Draggable
+          key={`s-${values.layoutSecondaryLogoDeltaX}-${values.layoutSecondaryLogoDeltaY}`}
+          nodeRef={secondaryRef}
+          bounds="parent"
+          defaultPosition={{ x: 0, y: 0 }}
+          onStop={commitSecondaryStop}
+        >
+          <div
+            ref={secondaryRef}
+            role="button"
+            tabIndex={0}
+            aria-label="Drag secondary logo"
+            className={handleClass}
+            style={rectToStyle(secondaryRect, s)}
+          />
+        </Draggable>
+      ) : null}
 
       <Draggable
         key={`t-${values.layoutTextBlockDeltaX}-${values.layoutTextBlockDeltaY}`}
         nodeRef={textRef}
         bounds="parent"
         defaultPosition={{ x: 0, y: 0 }}
-        onStop={handleTextStop}
+        onStop={commitTextStop}
       >
         <div
           ref={textRef}
@@ -157,36 +220,28 @@ export const BannerLayoutEditor = ({ values, onLayoutDeltaChange }: BannerLayout
           tabIndex={0}
           aria-label="Drag title and description text block"
           className={handleClass}
-          style={{
-            left: (LAYOUT_TEXT_BLOCK_LEFT + values.layoutTextBlockDeltaX) * s,
-            top: (LAYOUT_TEXT_BLOCK_TOP + values.layoutTextBlockDeltaY) * s,
-            width: LAYOUT_TEXT_BLOCK_WIDTH * s,
-            height: LAYOUT_TEXT_BLOCK_HEIGHT * s
-          }}
+          style={rectToStyle(textRect, s)}
         />
       </Draggable>
 
-      <Draggable
-        key={`ph-${values.layoutPhoneGroupDeltaX}-${values.layoutPhoneGroupDeltaY}`}
-        nodeRef={phoneRef}
-        bounds="parent"
-        defaultPosition={{ x: 0, y: 0 }}
-        onStop={handlePhoneStop}
-      >
-        <div
-          ref={phoneRef}
-          role="button"
-          tabIndex={0}
-          aria-label="Drag phone number and icon"
-          className={handleClass}
-          style={{
-            left: (LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX) * s,
-            top: (LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY) * s,
-            width: LAYOUT_PHONE_REGION_W * s,
-            height: LAYOUT_PHONE_REGION_H * s
-          }}
-        />
-      </Draggable>
+      {phoneRect ? (
+        <Draggable
+          key={`ph-${values.layoutPhoneGroupDeltaX}-${values.layoutPhoneGroupDeltaY}`}
+          nodeRef={phoneRef}
+          bounds="parent"
+          defaultPosition={{ x: 0, y: 0 }}
+          onStop={commitPhoneStop}
+        >
+          <div
+            ref={phoneRef}
+            role="button"
+            tabIndex={0}
+            aria-label="Drag phone number and icon"
+            className={handleClass}
+            style={rectToStyle(phoneRect, s)}
+          />
+        </Draggable>
+      ) : null}
     </div>
   );
 };

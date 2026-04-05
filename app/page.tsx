@@ -5,6 +5,8 @@ import Image from "next/image";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { ChatAssistant } from "@/components/ChatAssistant";
 import { BannerPreview } from "@/components/BannerPreview";
+import { nudgeLayoutOverlay, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
+import type { LayoutOverlayPayload } from "@/types/banner";
 import { BannerFormValues, RevisionAction } from "@/types/banner";
 
 const INITIAL_VALUES: BannerFormValues = {
@@ -90,6 +92,7 @@ const HomePage = () => {
   const [isLoadingOverlay, setIsLoadingOverlay] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [layoutOverlay, setLayoutOverlay] = useState<LayoutOverlayPayload | null>(null);
   const overlayRequestId = useRef(0);
 
   const generateNonce = (): string => {
@@ -215,6 +218,7 @@ const HomePage = () => {
       const nextBackground = stripQuery(data.backgroundUrl ?? data.imageUrl ?? "");
       setBackgroundUrl(nextBackground);
       setPreviewUrl(null);
+      setLayoutOverlay(null);
       setIsLoadingOverlay(true);
       setLoadingProgress(100);
     } catch {
@@ -247,6 +251,7 @@ const HomePage = () => {
   };
 
   const handleResetLayout = useCallback(() => {
+    setLayoutOverlay(null);
     setValues((previous) => ({
       ...previous,
       layoutPrimaryLogoDeltaX: 0,
@@ -258,6 +263,10 @@ const HomePage = () => {
       layoutPhoneGroupDeltaX: 0,
       layoutPhoneGroupDeltaY: 0
     }));
+  }, []);
+
+  const handleLayoutDragNudge = useCallback((group: LayoutDragGroup, dx: number, dy: number) => {
+    setLayoutOverlay((previous) => nudgeLayoutOverlay(previous, group, dx, dy));
   }, []);
 
   useEffect(() => {
@@ -281,7 +290,11 @@ const HomePage = () => {
             method: "POST",
             body: formData
           });
-          const data = (await response.json()) as { imageUrl?: string; error?: string };
+          const data = (await response.json()) as {
+            imageUrl?: string;
+            error?: string;
+            layoutOverlay?: LayoutOverlayPayload;
+          };
 
           if (overlayRequestId.current !== requestId) {
             return;
@@ -293,6 +306,7 @@ const HomePage = () => {
           }
 
           setPreviewUrl(data.imageUrl);
+          setLayoutOverlay(data.layoutOverlay ?? null);
         } catch {
           if (overlayRequestId.current === requestId) {
             setErrorMessage("Unable to render overlay. Please retry.");
@@ -363,6 +377,10 @@ const HomePage = () => {
             onLayoutDeltaChange={handlePatchFromChat}
             onResetLayout={handleResetLayout}
             layoutOverlayActive={Boolean(previewUrl && hasBackground)}
+            layoutOverlay={layoutOverlay}
+            onLayoutDragNudge={handleLayoutDragNudge}
+            hasPrimaryLogo={Boolean(files.primaryLogo)}
+            hasSecondaryLogo={Boolean(files.secondaryLogo)}
           />
 
           {errorMessage ? (
