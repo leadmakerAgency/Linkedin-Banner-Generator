@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 
+// Vercel Blob public URLs always use this host suffix — used for allowlisting only.
 const VERCEL_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 /** SSRF-safe: only Vercel Blob public hostnames are allowed for server-side fetch. */
@@ -23,6 +24,7 @@ export const isTrustedBackgroundHttpsUrl = (href: string): boolean => {
 export const resolveBackgroundImageBuffer = async (source: string): Promise<Buffer> => {
   const trimmed = source.split("?")[0] ?? source;
 
+  // Local Next dev: backgrounds still live on disk under public/generated.
   if (trimmed.startsWith("/generated/")) {
     const basename = path.basename(trimmed);
     if (!/^[a-zA-Z0-9-]+\.png$/i.test(basename)) {

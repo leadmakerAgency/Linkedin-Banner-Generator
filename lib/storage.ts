@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
+// Persisted banner PNGs: Vercel Blob in production, local public/generated when no token (dev).
 export interface StoredAsset {
   filename: string;
   publicUrl: string;
@@ -12,6 +13,7 @@ export const saveOutputPng = async (imageBuffer: Buffer): Promise<StoredAsset> =
   const filename = `${randomUUID()}.png`;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
+  // Serverless filesystem is read-only without Blob; fail fast with a clear message.
   if (process.env.VERCEL && !token) {
     throw new Error(
       "BLOB_READ_WRITE_TOKEN is not set. Add a Vercel Blob store token in Project Settings → Environment Variables."
