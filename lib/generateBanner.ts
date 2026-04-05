@@ -1,5 +1,16 @@
 import { z } from "zod";
 import { resolveBackgroundImageBuffer } from "@/lib/backgroundSource";
+import {
+  LAYOUT_CONTENT_START_X,
+  LAYOUT_LOGO_TOP,
+  LAYOUT_MARGIN,
+  LAYOUT_PRIMARY_LOGO_BOX,
+  LAYOUT_SECONDARY_LOGO_BOX,
+  LAYOUT_SECONDARY_LOGO_RIGHT_PAD,
+  LAYOUT_SECONDARY_LOGO_TOP,
+  LAYOUT_TITLE_Y
+} from "@/lib/bannerLayoutConstants";
+import { renderTextRaster } from "@/lib/overlayText";
 import { generateCreativeBaseImage } from "@/lib/openai";
 import { buildStructuredPrompt } from "@/lib/promptBuilder";
 import { getRevisionPatch } from "@/lib/revision";
@@ -14,6 +25,11 @@ import {
   StylePresetId
 } from "@/types/banner";
 import sharp from "sharp";
+
+const layoutDeltaField = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? 0 : val),
+  z.coerce.number().int().min(-400).max(400)
+);
 
 const generationSchema = z.object({
   bannerType: z.enum(["personal", "corporate"]),
@@ -77,6 +93,14 @@ const generationSchema = z.object({
   phoneNumber: z.string().trim().min(6).max(40),
   phoneIconOffsetX: z.coerce.number().int().min(-400).max(400),
   phoneIconOffsetY: z.coerce.number().int().min(-200).max(200),
+  layoutPrimaryLogoDeltaX: layoutDeltaField,
+  layoutPrimaryLogoDeltaY: layoutDeltaField,
+  layoutSecondaryLogoDeltaX: layoutDeltaField,
+  layoutSecondaryLogoDeltaY: layoutDeltaField,
+  layoutTextBlockDeltaX: layoutDeltaField,
+  layoutTextBlockDeltaY: layoutDeltaField,
+  layoutPhoneGroupDeltaX: layoutDeltaField,
+  layoutPhoneGroupDeltaY: layoutDeltaField,
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
   stylePreset: z.enum([
     "corporate",
@@ -153,15 +177,6 @@ export const readBackgroundBufferFromPublicUrl = async (publicUrl: string): Prom
 
 const resizeLogoBuffer = async (buffer: Buffer, maxWidth: number, maxHeight: number): Promise<Buffer> => {
   return sharp(buffer).resize({ width: maxWidth, height: maxHeight, fit: "inside", withoutEnlargement: true }).png().toBuffer();
-};
-
-const escapeXml = (text: string): string => {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
 };
 
 const wrapTextLines = (text: string, maxLineLength: number, maxLines: number): string[] => {
@@ -253,33 +268,12 @@ export const overlayBrandElements = async (
   primaryLogo?: File | null,
   secondaryLogo?: File | null
 ): Promise<Buffer> => {
-  const fontFamilyMap: Record<BannerGenerationInput["companyNameFontStyle"], string> = {
-    inter: "Inter, Arial, sans-serif",
-    poppins: "Poppins, Arial, sans-serif",
-    montserrat: "Montserrat, Arial, sans-serif",
-    lato: "Lato, Arial, sans-serif",
-    roboto: "Roboto, Arial, sans-serif",
-    openSans: "Open Sans, Arial, sans-serif",
-    nunito: "Nunito, Arial, sans-serif",
-    raleway: "Raleway, Arial, sans-serif",
-    oswald: "Oswald, Arial, sans-serif",
-    playfairDisplay: "Playfair Display, Georgia, serif",
-    merriweather: "Merriweather, Georgia, serif",
-    ubuntu: "Ubuntu, Arial, sans-serif",
-    workSans: "Work Sans, Arial, sans-serif",
-    sourceSansPro: "Source Sans Pro, Arial, sans-serif",
-    manrope: "Manrope, Arial, sans-serif",
-    mulish: "Mulish, Arial, sans-serif",
-    quicksand: "Quicksand, Arial, sans-serif",
-    ptSans: "PT Sans, Arial, sans-serif",
-    dmSans: "DM Sans, Arial, sans-serif",
-    libreBaskerville: "Libre Baskerville, Georgia, serif"
-  };
-  const maxLogoWidth = Math.round(88 * patchLogoScale);
-  const maxLogoHeight = Math.round(88 * patchLogoScale);
-  const margin = 20;
-  const contentStartX = Math.round(BANNER_WIDTH * 0.3) + 24;
-  const titleY = Math.round(BANNER_HEIGHT * 0.46);
+  const maxLogoWidth = Math.round(LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
+  const maxLogoHeight = Math.round(LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
+  const margin = LAYOUT_MARGIN;
+  const logoTopLeft = LAYOUT_LOGO_TOP;
+  const contentStartX = LAYOUT_CONTENT_START_X + values.layoutTextBlockDeltaX;
+  const titleY = LAYOUT_TITLE_Y + values.layoutTextBlockDeltaY;
 
   const overlays: sharp.OverlayOptions[] = [];
   let primaryBuffer: Buffer | undefined;
@@ -294,31 +288,33 @@ export const overlayBrandElements = async (
   }
 
   if (secondaryLogo) {
-    secondaryBuffer = await resizeLogoBuffer(Buffer.from(await secondaryLogo.arrayBuffer()), 72, 72);
+    secondaryBuffer = await resizeLogoBuffer(Buffer.from(await secondaryLogo.arrayBuffer()), LAYOUT_SECONDARY_LOGO_BOX, LAYOUT_SECONDARY_LOGO_BOX);
     const meta = await sharp(secondaryBuffer).metadata();
     secondaryWidth = meta.width ?? 0;
   }
 
-  const currentLeft = contentStartX;
-  const logoTopLeft = margin;
+  const primaryLeft = margin + values.layoutPrimaryLogoDeltaX;
+  const primaryTop = logoTopLeft + values.layoutPrimaryLogoDeltaY;
 
   if (primaryBuffer && primaryWidth > 0) {
     overlays.push({
       input: primaryBuffer,
-      left: margin,
-      top: logoTopLeft
+      left: primaryLeft,
+      top: primaryTop
     });
   }
 
-  const companyName = escapeXml(values.companyName);
-  const descriptionLines = wrapTextLines(values.companyDescription, 62, 2).map((line) => escapeXml(line));
-  const phone = escapeXml(values.phoneNumber);
+  const companyNameRaw = values.companyName.trim();
+  const descriptionLines = wrapTextLines(values.companyDescription, 62, 2);
+  const phoneRaw = values.phoneNumber.trim();
   const companyNameFontSize = values.companyNameFontSize;
   const companyDescriptionFontSize = values.companyDescriptionFontSize;
   const companyNameFontWeight = values.companyNameFontWeight;
   const companyDescriptionFontWeight = values.companyDescriptionFontWeight;
   const descriptionLineGap = Math.round(companyDescriptionFontSize * 1.25);
   const descriptionStartY = titleY + Math.round(companyNameFontSize * 0.54);
+  const currentLeft = contentStartX;
+
   const autoNameColorSampleArea = {
     left: currentLeft,
     top: Math.max(0, titleY - 56),
@@ -346,15 +342,62 @@ export const overlayBrandElements = async (
       ? values.companyDescriptionTextColor
       : await resolveAutoContrastColor(bannerBuffer, autoDescriptionColorSampleArea);
   const phoneTextColor = await resolveAutoContrastColor(bannerBuffer, autoPhoneColorSampleArea);
-  const companyNameFontFamily = fontFamilyMap[values.companyNameFontStyle];
-  const descriptionFontFamily = fontFamilyMap[values.companyDescriptionFontStyle];
-  const secondaryLogoLeft = BANNER_WIDTH - secondaryWidth - 26;
-  const secondaryLogoTop = 24;
+
+  const textMaxWidth = Math.max(180, BANNER_WIDTH - currentLeft - 140);
+
+  const nameRaster = await renderTextRaster({
+    text: companyNameRaw,
+    fontStyle: values.companyNameFontStyle,
+    fontWeight: companyNameFontWeight,
+    fontSizePx: companyNameFontSize,
+    colorHex: companyNameTextColor,
+    maxWidth: textMaxWidth,
+    align: "left"
+  });
+  if (nameRaster) {
+    const nameTop = Math.max(0, Math.round(titleY - companyNameFontSize * 0.72));
+    overlays.push({ input: nameRaster.buffer, left: currentLeft, top: nameTop });
+  }
+
+  const line0 = descriptionLines[0] ?? "";
+  const line1 = descriptionLines[1] ?? "";
+  const desc0Raster = line0
+    ? await renderTextRaster({
+        text: line0,
+        fontStyle: values.companyDescriptionFontStyle,
+        fontWeight: companyDescriptionFontWeight,
+        fontSizePx: companyDescriptionFontSize,
+        colorHex: descriptionTextColor,
+        maxWidth: textMaxWidth,
+        align: "left"
+      })
+    : null;
+  if (desc0Raster) {
+    const top0 = Math.max(0, Math.round(descriptionStartY - companyDescriptionFontSize * 0.72));
+    overlays.push({ input: desc0Raster.buffer, left: currentLeft, top: top0 });
+  }
+
+  const desc1Raster = line1
+    ? await renderTextRaster({
+        text: line1,
+        fontStyle: values.companyDescriptionFontStyle,
+        fontWeight: companyDescriptionFontWeight,
+        fontSizePx: companyDescriptionFontSize,
+        colorHex: descriptionTextColor,
+        maxWidth: textMaxWidth,
+        align: "left"
+      })
+    : null;
+  if (desc1Raster) {
+    const top1 = Math.max(0, Math.round(descriptionStartY + descriptionLineGap - companyDescriptionFontSize * 0.72));
+    overlays.push({ input: desc1Raster.buffer, left: currentLeft, top: top1 });
+  }
+
   const phoneFontSize = 22;
   const iconSize = 30;
-  const phoneAnchorX = BANNER_WIDTH - 18;
-  const phoneBaselineY = BANNER_HEIGHT - 8;
-  const approxPhoneWidth = Math.max(90, Math.round(phone.length * phoneFontSize * 0.55));
+  const phoneAnchorX = BANNER_WIDTH - 18 + values.layoutPhoneGroupDeltaX;
+  const phoneBaselineY = BANNER_HEIGHT - 8 + values.layoutPhoneGroupDeltaY;
+  const approxPhoneWidth = Math.max(90, Math.round(phoneRaw.length * phoneFontSize * 0.55));
   const iconGap = 4;
   const baseIconX = phoneAnchorX - approxPhoneWidth - iconSize - iconGap;
   const baseIconY = phoneBaselineY - iconSize + 11;
@@ -362,26 +405,32 @@ export const overlayBrandElements = async (
   const iconY = Math.min(BANNER_HEIGHT - iconSize - 2, Math.max(2, baseIconY + values.phoneIconOffsetY));
   const phoneTextY = iconY + iconSize / 2;
 
-  const textOverlaySvg = `
-    <svg width="${BANNER_WIDTH}" height="${BANNER_HEIGHT}" viewBox="0 0 ${BANNER_WIDTH} ${BANNER_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-      <text x="${currentLeft}" y="${titleY}" fill="${companyNameTextColor}" font-size="${companyNameFontSize}" font-weight="${companyNameFontWeight}" font-family="${companyNameFontFamily}">
-        ${companyName}
-      </text>
-      <text x="${currentLeft}" y="${descriptionStartY}" fill="${descriptionTextColor}" font-size="${companyDescriptionFontSize}" font-weight="${companyDescriptionFontWeight}" font-family="${descriptionFontFamily}">
-        ${(descriptionLines[0] ?? "")}
-      </text>
-      <text x="${currentLeft}" y="${descriptionStartY + descriptionLineGap}" fill="${descriptionTextColor}" font-size="${companyDescriptionFontSize}" font-weight="${companyDescriptionFontWeight}" font-family="${descriptionFontFamily}">
-        ${(descriptionLines[1] ?? "")}
-      </text>
-      <g transform="translate(${iconX} ${iconY}) scale(${iconSize / 24})">
-        <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
-      </g>
-      <text x="${phoneAnchorX}" y="${phoneTextY}" fill="${phoneTextColor}" font-size="${phoneFontSize}" font-weight="500" text-anchor="end" dominant-baseline="middle" font-family="Inter, Arial, sans-serif">
-        ${phone}
-      </text>
+  const phoneIconSvg = `
+    <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
     </svg>
   `;
-  overlays.push({ input: Buffer.from(textOverlaySvg), top: 0, left: 0 });
+  overlays.push({ input: Buffer.from(phoneIconSvg), left: iconX, top: iconY });
+
+  const phoneRaster = phoneRaw
+    ? await renderTextRaster({
+        text: phoneRaw,
+        fontStyle: values.companyNameFontStyle,
+        fontWeight: "500",
+        fontSizePx: phoneFontSize,
+        colorHex: phoneTextColor,
+        maxWidth: 420,
+        align: "right"
+      })
+    : null;
+  if (phoneRaster) {
+    const phoneLeft = Math.max(0, phoneAnchorX - phoneRaster.width);
+    const phoneTop = Math.max(0, Math.round(phoneTextY - phoneRaster.height / 2));
+    overlays.push({ input: phoneRaster.buffer, left: phoneLeft, top: phoneTop });
+  }
+
+  const secondaryLogoLeft = BANNER_WIDTH - secondaryWidth - LAYOUT_SECONDARY_LOGO_RIGHT_PAD + values.layoutSecondaryLogoDeltaX;
+  const secondaryLogoTop = LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY;
 
   if (secondaryBuffer && secondaryWidth > 0) {
     overlays.push({ input: secondaryBuffer, left: secondaryLogoLeft, top: secondaryLogoTop });
@@ -460,6 +509,14 @@ export const parseBannerInput = (formData: FormData): {
     phoneNumber: parseFormValue(formData.get("phoneNumber")),
     phoneIconOffsetX: parseFormValue(formData.get("phoneIconOffsetX")),
     phoneIconOffsetY: parseFormValue(formData.get("phoneIconOffsetY")),
+    layoutPrimaryLogoDeltaX: parseFormValue(formData.get("layoutPrimaryLogoDeltaX")),
+    layoutPrimaryLogoDeltaY: parseFormValue(formData.get("layoutPrimaryLogoDeltaY")),
+    layoutSecondaryLogoDeltaX: parseFormValue(formData.get("layoutSecondaryLogoDeltaX")),
+    layoutSecondaryLogoDeltaY: parseFormValue(formData.get("layoutSecondaryLogoDeltaY")),
+    layoutTextBlockDeltaX: parseFormValue(formData.get("layoutTextBlockDeltaX")),
+    layoutTextBlockDeltaY: parseFormValue(formData.get("layoutTextBlockDeltaY")),
+    layoutPhoneGroupDeltaX: parseFormValue(formData.get("layoutPhoneGroupDeltaX")),
+    layoutPhoneGroupDeltaY: parseFormValue(formData.get("layoutPhoneGroupDeltaY")),
     imageModel: parseFormValue(formData.get("imageModel")) as BannerGenerationInput["imageModel"],
     stylePreset: parseFormValue(formData.get("stylePreset")) as StylePresetId
   });

@@ -70,6 +70,18 @@ export interface BannerFormValues {
   /** Pixels to nudge only the phone handset icon (number stays fixed); positive X = right, positive Y = down. */
   phoneIconOffsetX: number;
   phoneIconOffsetY: number;
+  /** Draggable layout: added to default primary logo top-left (banner px). */
+  layoutPrimaryLogoDeltaX: number;
+  layoutPrimaryLogoDeltaY: number;
+  /** Draggable layout: added to default secondary logo position. */
+  layoutSecondaryLogoDeltaX: number;
+  layoutSecondaryLogoDeltaY: number;
+  /** Draggable layout: shifts company name + description lines together. */
+  layoutTextBlockDeltaX: number;
+  layoutTextBlockDeltaY: number;
+  /** Draggable layout: shifts phone icon + number together. */
+  layoutPhoneGroupDeltaX: number;
+  layoutPhoneGroupDeltaY: number;
   stylePreset: StylePresetId;
   imageModel: ImageModelId;
 }

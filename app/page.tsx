@@ -27,6 +27,14 @@ const INITIAL_VALUES: BannerFormValues = {
   phoneNumber: "",
   phoneIconOffsetX: 0,
   phoneIconOffsetY: 0,
+  layoutPrimaryLogoDeltaX: 0,
+  layoutPrimaryLogoDeltaY: 0,
+  layoutSecondaryLogoDeltaX: 0,
+  layoutSecondaryLogoDeltaY: 0,
+  layoutTextBlockDeltaX: 0,
+  layoutTextBlockDeltaY: 0,
+  layoutPhoneGroupDeltaX: 0,
+  layoutPhoneGroupDeltaY: 0,
   stylePreset: "corporate",
   imageModel: "gpt-image-1"
 };
@@ -146,6 +154,14 @@ const HomePage = () => {
       formData.set("phoneNumber", phoneNumber);
       formData.set("phoneIconOffsetX", String(values.phoneIconOffsetX));
       formData.set("phoneIconOffsetY", String(values.phoneIconOffsetY));
+      formData.set("layoutPrimaryLogoDeltaX", String(values.layoutPrimaryLogoDeltaX));
+      formData.set("layoutPrimaryLogoDeltaY", String(values.layoutPrimaryLogoDeltaY));
+      formData.set("layoutSecondaryLogoDeltaX", String(values.layoutSecondaryLogoDeltaX));
+      formData.set("layoutSecondaryLogoDeltaY", String(values.layoutSecondaryLogoDeltaY));
+      formData.set("layoutTextBlockDeltaX", String(values.layoutTextBlockDeltaX));
+      formData.set("layoutTextBlockDeltaY", String(values.layoutTextBlockDeltaY));
+      formData.set("layoutPhoneGroupDeltaX", String(values.layoutPhoneGroupDeltaX));
+      formData.set("layoutPhoneGroupDeltaY", String(values.layoutPhoneGroupDeltaY));
       formData.set("stylePreset", values.stylePreset);
       formData.set("imageModel", values.imageModel);
       if (files.primaryLogo) {
@@ -229,6 +245,20 @@ const HomePage = () => {
       ...patch
     }));
   };
+
+  const handleResetLayout = useCallback(() => {
+    setValues((previous) => ({
+      ...previous,
+      layoutPrimaryLogoDeltaX: 0,
+      layoutPrimaryLogoDeltaY: 0,
+      layoutSecondaryLogoDeltaX: 0,
+      layoutSecondaryLogoDeltaY: 0,
+      layoutTextBlockDeltaX: 0,
+      layoutTextBlockDeltaY: 0,
+      layoutPhoneGroupDeltaX: 0,
+      layoutPhoneGroupDeltaY: 0
+    }));
+  }, []);
 
   useEffect(() => {
     if (!backgroundUrl) {
@@ -329,6 +359,10 @@ const HomePage = () => {
             onRegenerateBackground={handleRegenerateBackground}
             onRevisionBackground={handleRevisionBackground}
             downloadUrl={previewUrl}
+            layoutValues={values}
+            onLayoutDeltaChange={handlePatchFromChat}
+            onResetLayout={handleResetLayout}
+            layoutOverlayActive={Boolean(previewUrl && hasBackground)}
           />
 
           {errorMessage ? (

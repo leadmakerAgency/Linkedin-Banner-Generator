@@ -1,5 +1,6 @@
 "use client";
-import { RevisionAction } from "@/types/banner";
+import { BannerLayoutEditor } from "@/components/BannerLayoutEditor";
+import type { BannerFormValues, RevisionAction } from "@/types/banner";
 
 interface BannerPreviewProps {
   /** Merged preview when overlay has rendered; may be background-only until first overlay completes. */
@@ -12,6 +13,10 @@ interface BannerPreviewProps {
   onRevisionBackground: (action: RevisionAction) => void;
   /** Final merged PNG for download; disabled until overlay render exists. */
   downloadUrl: string | null;
+  layoutValues: BannerFormValues;
+  onLayoutDeltaChange: (patch: Partial<BannerFormValues>) => void;
+  onResetLayout: () => void;
+  layoutOverlayActive: boolean;
 }
 
 const revisionActions: Array<{ value: RevisionAction; label: string }> = [
@@ -30,40 +35,59 @@ export const BannerPreview = ({
   loadingProgress,
   onRegenerateBackground,
   onRevisionBackground,
-  downloadUrl
+  downloadUrl,
+  layoutValues,
+  onLayoutDeltaChange,
+  onResetLayout,
+  layoutOverlayActive
 }: BannerPreviewProps) => {
   return (
     <section className="rounded-2xl border border-slate-800/90 bg-slate-900/75 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl" aria-live="polite">
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-100">Preview</h2>
           <p className="text-sm text-slate-400">Output resolution is fixed at 1584x396 px.</p>
           <p className="mt-1 text-xs text-slate-500">
             {hasBackground
-              ? "Background is fixed until you regenerate. Text, fonts, colors, and logos update automatically."
+              ? "Background is fixed until you regenerate. Drag dashed regions to move logos, text, or phone; server saves layout in the exported PNG."
               : "Generate a GPT background first, then edit overlays in the form."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRegenerateBackground}
-          disabled={isLoadingBackground || !hasBackground}
-          className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isLoadingBackground ? "Working..." : "Regenerate background"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onResetLayout}
+            disabled={!layoutOverlayActive || isLoadingOverlay}
+            className="rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset layout
+          </button>
+          <button
+            type="button"
+            onClick={onRegenerateBackground}
+            disabled={isLoadingBackground || !hasBackground}
+            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoadingBackground ? "Working..." : "Regenerate background"}
+          </button>
+        </div>
       </div>
 
-      <div className="relative mb-5 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/80 shadow-inner">
+      <div className="relative mb-5 aspect-[1584/396] overflow-hidden rounded-xl border border-slate-700 bg-slate-950/80 shadow-inner">
         {displayUrl ? (
-          <img
-            key={displayUrl}
-            src={displayUrl}
-            alt="LinkedIn banner preview"
-            className="h-auto w-full"
-          />
+          <>
+            <img
+              key={displayUrl}
+              src={displayUrl}
+              alt="LinkedIn banner preview"
+              className="pointer-events-none h-full w-full object-cover"
+            />
+            {layoutOverlayActive ? (
+              <BannerLayoutEditor values={layoutValues} onLayoutDeltaChange={onLayoutDeltaChange} />
+            ) : null}
+          </>
         ) : (
-          <div className="flex aspect-[4/1] items-center justify-center text-sm text-slate-400">
+          <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-slate-400">
             Generate a background to preview your banner.
           </div>
         )}
