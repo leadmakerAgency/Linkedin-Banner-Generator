@@ -88,13 +88,19 @@ const stripQuery = (url: string): string => {
   return url.split("?")[0] ?? url;
 };
 
-const DRAFT_STORAGE_KEY = "linkedin-banner-generator-draft-v2";
-
-type DraftSnapshot = {
-  values: BannerFormValues;
-  prompt: string;
-  updatedAt: string;
-};
+const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
+  ...base,
+  phoneIconOffsetX: 0,
+  phoneIconOffsetY: 0,
+  layoutPrimaryLogoDeltaX: 0,
+  layoutPrimaryLogoDeltaY: 0,
+  layoutSecondaryLogoDeltaX: 0,
+  layoutSecondaryLogoDeltaY: 0,
+  layoutTextBlockDeltaX: 0,
+  layoutTextBlockDeltaY: 0,
+  layoutPhoneGroupDeltaX: 0,
+  layoutPhoneGroupDeltaY: 0
+});
 
 const HomePage = () => {
   const [values, setValues] = useState<BannerFormValues>(INITIAL_VALUES);
@@ -148,41 +154,42 @@ const HomePage = () => {
   ].join(" ");
 
   const handleBuildFormData = useCallback(
-    (revisionAction?: RevisionAction, forceFresh?: boolean): FormData => {
-      const companyName = values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
-      const companyDescription = values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
-      const phoneNumber = values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
+    (revisionAction?: RevisionAction, forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
+      const v = sourceValues ?? values;
+      const companyName = v.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
+      const companyDescription = v.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
+      const phoneNumber = v.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
 
       const formData = new FormData();
-      formData.set("bannerType", values.bannerType);
+      formData.set("bannerType", v.bannerType);
       formData.set("companyName", companyName);
       formData.set("companyDescription", companyDescription);
-      formData.set("companyNameFontStyle", values.companyNameFontStyle);
-      formData.set("companyDescriptionFontStyle", values.companyDescriptionFontStyle);
-      formData.set("companyNameFontSize", String(values.companyNameFontSize));
-      formData.set("companyDescriptionFontSize", String(values.companyDescriptionFontSize));
-      formData.set("companyNameFontWeight", values.companyNameFontWeight);
-      formData.set("companyDescriptionFontWeight", values.companyDescriptionFontWeight);
-      formData.set("companyNameColorMode", values.companyNameColorMode);
-      formData.set("companyNameTextColor", values.companyNameTextColor);
-      formData.set("companyDescriptionColorMode", values.companyDescriptionColorMode);
-      formData.set("companyDescriptionTextColor", values.companyDescriptionTextColor);
-      formData.set("companyPageType", values.companyPageType);
-      formData.set("primaryBrandColor", values.primaryBrandColor);
-      formData.set("secondaryBrandColor", values.secondaryBrandColor);
+      formData.set("companyNameFontStyle", v.companyNameFontStyle);
+      formData.set("companyDescriptionFontStyle", v.companyDescriptionFontStyle);
+      formData.set("companyNameFontSize", String(v.companyNameFontSize));
+      formData.set("companyDescriptionFontSize", String(v.companyDescriptionFontSize));
+      formData.set("companyNameFontWeight", v.companyNameFontWeight);
+      formData.set("companyDescriptionFontWeight", v.companyDescriptionFontWeight);
+      formData.set("companyNameColorMode", v.companyNameColorMode);
+      formData.set("companyNameTextColor", v.companyNameTextColor);
+      formData.set("companyDescriptionColorMode", v.companyDescriptionColorMode);
+      formData.set("companyDescriptionTextColor", v.companyDescriptionTextColor);
+      formData.set("companyPageType", v.companyPageType);
+      formData.set("primaryBrandColor", v.primaryBrandColor);
+      formData.set("secondaryBrandColor", v.secondaryBrandColor);
       formData.set("phoneNumber", phoneNumber);
-      formData.set("phoneIconOffsetX", String(values.phoneIconOffsetX));
-      formData.set("phoneIconOffsetY", String(values.phoneIconOffsetY));
-      formData.set("layoutPrimaryLogoDeltaX", String(values.layoutPrimaryLogoDeltaX));
-      formData.set("layoutPrimaryLogoDeltaY", String(values.layoutPrimaryLogoDeltaY));
-      formData.set("layoutSecondaryLogoDeltaX", String(values.layoutSecondaryLogoDeltaX));
-      formData.set("layoutSecondaryLogoDeltaY", String(values.layoutSecondaryLogoDeltaY));
-      formData.set("layoutTextBlockDeltaX", String(values.layoutTextBlockDeltaX));
-      formData.set("layoutTextBlockDeltaY", String(values.layoutTextBlockDeltaY));
-      formData.set("layoutPhoneGroupDeltaX", String(values.layoutPhoneGroupDeltaX));
-      formData.set("layoutPhoneGroupDeltaY", String(values.layoutPhoneGroupDeltaY));
-      formData.set("stylePreset", values.stylePreset);
-      formData.set("imageModel", values.imageModel);
+      formData.set("phoneIconOffsetX", String(v.phoneIconOffsetX));
+      formData.set("phoneIconOffsetY", String(v.phoneIconOffsetY));
+      formData.set("layoutPrimaryLogoDeltaX", String(v.layoutPrimaryLogoDeltaX));
+      formData.set("layoutPrimaryLogoDeltaY", String(v.layoutPrimaryLogoDeltaY));
+      formData.set("layoutSecondaryLogoDeltaX", String(v.layoutSecondaryLogoDeltaX));
+      formData.set("layoutSecondaryLogoDeltaY", String(v.layoutSecondaryLogoDeltaY));
+      formData.set("layoutTextBlockDeltaX", String(v.layoutTextBlockDeltaX));
+      formData.set("layoutTextBlockDeltaY", String(v.layoutTextBlockDeltaY));
+      formData.set("layoutPhoneGroupDeltaX", String(v.layoutPhoneGroupDeltaX));
+      formData.set("layoutPhoneGroupDeltaY", String(v.layoutPhoneGroupDeltaY));
+      formData.set("stylePreset", v.stylePreset);
+      formData.set("imageModel", v.imageModel);
       formData.set("promptSnapshot", generatedPrompt);
       if (files.primaryLogo) {
         formData.set("primaryLogo", files.primaryLogo);
@@ -205,7 +212,8 @@ const HomePage = () => {
   const handleBackgroundRequest = async (
     endpoint: "/api/generate-background" | "/api/revise",
     revisionAction?: RevisionAction,
-    forceFresh?: boolean
+    forceFresh?: boolean,
+    sourceValues?: BannerFormValues
   ) => {
     setIsLoadingBackground(true);
     setLoadingProgress(8);
@@ -223,7 +231,7 @@ const HomePage = () => {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        body: handleBuildFormData(revisionAction, forceFresh)
+        body: handleBuildFormData(revisionAction, forceFresh, sourceValues)
       });
       const data = (await response.json()) as { backgroundUrl?: string; imageUrl?: string; error?: string };
 
@@ -249,11 +257,17 @@ const HomePage = () => {
   };
 
   const handleGenerateBackground = () => {
-    void handleBackgroundRequest("/api/generate-background", undefined, true);
+    const resetValues = withDefaultLayout(values);
+    setValues(resetValues);
+    setLayoutOverlay(null);
+    void handleBackgroundRequest("/api/generate-background", undefined, true, resetValues);
   };
 
   const handleRegenerateBackground = () => {
-    void handleBackgroundRequest("/api/generate-background", undefined, true);
+    const resetValues = withDefaultLayout(values);
+    setValues(resetValues);
+    setLayoutOverlay(null);
+    void handleBackgroundRequest("/api/generate-background", undefined, true, resetValues);
   };
 
   const handleRevisionBackground = (action: RevisionAction) => {
@@ -287,39 +301,8 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw) as Partial<DraftSnapshot>;
-      if (!parsed.values) {
-        return;
-      }
-      const merged = {
-        ...INITIAL_VALUES,
-        ...parsed.values
-      };
-      setValues(merged);
-    } catch {
-      // ignore malformed draft
-    }
-  }, []);
-
-  useEffect(() => {
     setPromptSnapshot(generatedPrompt);
-    const snapshot: DraftSnapshot = {
-      values,
-      prompt: generatedPrompt,
-      updatedAt: new Date().toISOString()
-    };
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
-    }
-  }, [generatedPrompt, values]);
+  }, [generatedPrompt]);
 
   useEffect(() => {
     if (previousBannerType.current === null) {
