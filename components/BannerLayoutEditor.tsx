@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type PointerEvent, useState } from "react";
 import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
-import { clampByDeltaLimits, clampRectWithinBanner, getPreviewScale, toBannerDelta } from "@/lib/layoutDragMath";
+import { clampRectWithinBanner, getPreviewScale, toBannerDelta } from "@/lib/layoutDragMath";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { BannerFormValues, LayoutElementRect, LayoutOverlayPayload } from "@/types/banner";
 import { getBannerDimensions } from "@/types/banner";
@@ -121,31 +121,32 @@ export const BannerLayoutEditor = ({
     width: L.LAYOUT_PHONE_REGION_W,
     height: L.LAYOUT_PHONE_REGION_H
   };
+  const showPhoneHandle = values.phoneNumber.trim().length > 0;
 
   const commitGroupDelta = (group: LayoutDragGroup, dx: number, dy: number) => {
     switch (group) {
       case "primary":
         onLayoutDeltaChange({
-          layoutPrimaryLogoDeltaX: clampByDeltaLimits(values.layoutPrimaryLogoDeltaX + dx),
-          layoutPrimaryLogoDeltaY: clampByDeltaLimits(values.layoutPrimaryLogoDeltaY + dy)
+          layoutPrimaryLogoDeltaX: values.layoutPrimaryLogoDeltaX + dx,
+          layoutPrimaryLogoDeltaY: values.layoutPrimaryLogoDeltaY + dy
         });
         break;
       case "secondary":
         onLayoutDeltaChange({
-          layoutSecondaryLogoDeltaX: clampByDeltaLimits(values.layoutSecondaryLogoDeltaX + dx),
-          layoutSecondaryLogoDeltaY: clampByDeltaLimits(values.layoutSecondaryLogoDeltaY + dy)
+          layoutSecondaryLogoDeltaX: values.layoutSecondaryLogoDeltaX + dx,
+          layoutSecondaryLogoDeltaY: values.layoutSecondaryLogoDeltaY + dy
         });
         break;
       case "text":
         onLayoutDeltaChange({
-          layoutTextBlockDeltaX: clampByDeltaLimits(values.layoutTextBlockDeltaX + dx),
-          layoutTextBlockDeltaY: clampByDeltaLimits(values.layoutTextBlockDeltaY + dy)
+          layoutTextBlockDeltaX: values.layoutTextBlockDeltaX + dx,
+          layoutTextBlockDeltaY: values.layoutTextBlockDeltaY + dy
         });
         break;
       case "phone":
         onLayoutDeltaChange({
-          layoutPhoneGroupDeltaX: clampByDeltaLimits(values.layoutPhoneGroupDeltaX + dx),
-          layoutPhoneGroupDeltaY: clampByDeltaLimits(values.layoutPhoneGroupDeltaY + dy)
+          layoutPhoneGroupDeltaX: values.layoutPhoneGroupDeltaX + dx,
+          layoutPhoneGroupDeltaY: values.layoutPhoneGroupDeltaY + dy
         });
         break;
       default:
@@ -205,7 +206,7 @@ export const BannerLayoutEditor = ({
   const renderedPrimaryRect = primaryRect ? applyDelta(primaryRect, liveOffsets.primary.dx, liveOffsets.primary.dy) : null;
   const renderedSecondaryRect = secondaryRect ? applyDelta(secondaryRect, liveOffsets.secondary.dx, liveOffsets.secondary.dy) : null;
   const renderedTextRect = applyDelta(textRect, liveOffsets.text.dx, liveOffsets.text.dy);
-  const renderedPhoneRect = applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy);
+  const renderedPhoneRect = showPhoneHandle ? applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -249,17 +250,19 @@ export const BannerLayoutEditor = ({
         onPointerCancel={(event) => cancelDrag(event, "text")}
       />
 
-      <div
-        className={handleClass}
-        role="button"
-        tabIndex={0}
-        aria-label="Drag phone number and icon"
-        style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
-        onPointerDown={(event) => startDrag(event, "phone")}
-        onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
-        onPointerUp={(event) => stopDrag(event, "phone")}
-        onPointerCancel={(event) => cancelDrag(event, "phone")}
-      />
+      {renderedPhoneRect ? (
+        <div
+          className={handleClass}
+          role="button"
+          tabIndex={0}
+          aria-label="Drag phone number and icon"
+          style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
+          onPointerDown={(event) => startDrag(event, "phone")}
+          onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
+          onPointerUp={(event) => stopDrag(event, "phone")}
+          onPointerCancel={(event) => cancelDrag(event, "phone")}
+        />
+      ) : null}
     </div>
   );
 };

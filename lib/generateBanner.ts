@@ -22,7 +22,7 @@ import sharp from "sharp";
 
 const layoutDeltaField = z.preprocess(
   (val) => (typeof val === "string" && val.trim() === "" ? 0 : val),
-  z.coerce.number().int().min(-400).max(400)
+  z.coerce.number().int().min(-5000).max(5000)
 );
 
 const generationSchema = z

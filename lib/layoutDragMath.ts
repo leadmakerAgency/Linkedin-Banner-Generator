@@ -1,7 +1,5 @@
 import type { LayoutElementRect } from "@/types/banner";
 
-export const clampByDeltaLimits = (value: number): number => Math.max(-400, Math.min(400, value));
-
 export const getPreviewScale = (previewWidthPx: number, bannerWidthPx: number): number => {
   if (previewWidthPx <= 0 || bannerWidthPx <= 0) {
     return 1;

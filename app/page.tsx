@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
-import { ChatAssistant } from "@/components/ChatAssistant";
 import { BannerPreview } from "@/components/BannerPreview";
 import { nudgeLayoutOverlay, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { LayoutOverlayPayload } from "@/types/banner";
@@ -89,9 +88,40 @@ const stripQuery = (url: string): string => {
   return url.split("?")[0] ?? url;
 };
 
+const DRAFT_STORAGE_KEY = "linkedin-banner-generator-draft-v2";
+
+type DraftSnapshot = {
+  values: BannerFormValues;
+  prompt: string;
+  updatedAt: string;
+};
+
+const loadDraftValues = (): BannerFormValues => {
+  if (typeof window === "undefined") {
+    return INITIAL_VALUES;
+  }
+  try {
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) {
+      return INITIAL_VALUES;
+    }
+    const parsed = JSON.parse(raw) as Partial<DraftSnapshot>;
+    if (!parsed.values) {
+      return INITIAL_VALUES;
+    }
+    return {
+      ...INITIAL_VALUES,
+      ...parsed.values
+    };
+  } catch {
+    return INITIAL_VALUES;
+  }
+};
+
 const HomePage = () => {
-  const [values, setValues] = useState<BannerFormValues>(INITIAL_VALUES);
+  const [values, setValues] = useState<BannerFormValues>(loadDraftValues);
   const [files, setFiles] = useState<BannerFiles>(INITIAL_FILES);
+  const [promptSnapshot, setPromptSnapshot] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingBackground, setIsLoadingBackground] = useState(false);
@@ -110,7 +140,7 @@ const HomePage = () => {
   };
 
   const chatExportDims = getBannerDimensions(values.bannerType);
-  const autoChatPrompt = [
+  const generatedPrompt = [
     `Create a ${values.bannerType} LinkedIn banner.`,
     `Company name: ${values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName}.`,
     `Company description: ${values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription}.`,
@@ -175,6 +205,7 @@ const HomePage = () => {
       formData.set("layoutPhoneGroupDeltaY", String(values.layoutPhoneGroupDeltaY));
       formData.set("stylePreset", values.stylePreset);
       formData.set("imageModel", values.imageModel);
+      formData.set("promptSnapshot", generatedPrompt);
       if (files.primaryLogo) {
         formData.set("primaryLogo", files.primaryLogo);
       }
@@ -190,7 +221,7 @@ const HomePage = () => {
 
       return formData;
     },
-    [values, files]
+    [values, files, generatedPrompt]
   );
 
   const handleBackgroundRequest = async (
@@ -251,7 +282,7 @@ const HomePage = () => {
     void handleBackgroundRequest("/api/revise", action, false);
   };
 
-  const handlePatchFromChat = (patch: Partial<BannerFormValues>) => {
+  const handlePatchValues = (patch: Partial<BannerFormValues>) => {
     setValues((previous) => ({
       ...previous,
       ...patch
@@ -276,6 +307,18 @@ const HomePage = () => {
   const handleLayoutDragNudge = useCallback((group: LayoutDragGroup, dx: number, dy: number) => {
     setLayoutOverlay((previous) => nudgeLayoutOverlay(previous, group, dx, dy));
   }, []);
+
+  useEffect(() => {
+    setPromptSnapshot(generatedPrompt);
+    const snapshot: DraftSnapshot = {
+      values,
+      prompt: generatedPrompt,
+      updatedAt: new Date().toISOString()
+    };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+    }
+  }, [generatedPrompt, values]);
 
   useEffect(() => {
     if (previousBannerType.current === null) {
@@ -387,14 +430,28 @@ const HomePage = () => {
               onFilesChange={setFiles}
             />
 
-            <ChatAssistant
-              settings={values}
-              draftPrompt={autoChatPrompt}
-              embedded
-              onPatchSettings={handlePatchFromChat}
-              onGenerate={handleGenerateBackground}
-              generateButtonLabel={hasBackground ? "Regenerate background (GPT)" : "Generate background"}
-            />
+            <div className="mt-6 border-t border-slate-800 pt-6">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold tracking-tight text-slate-200">Live Prompt Snapshot</h3>
+                <button
+                  type="button"
+                  onClick={handleGenerateBackground}
+                  disabled={isLoadingBackground}
+                  className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+                >
+                  {isLoadingBackground ? "Generating..." : hasBackground ? "Regenerate background" : "Generate background"}
+                </button>
+              </div>
+              <p className="mb-2 text-xs text-slate-400">
+                Prompt updates automatically from your form values and is persisted locally with layout positions.
+              </p>
+              <textarea
+                readOnly
+                value={promptSnapshot}
+                className="h-36 w-full resize-none rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-xs text-slate-300 outline-none"
+                aria-label="Generated prompt snapshot"
+              />
+            </div>
           </div>
         </section>
 
@@ -409,7 +466,7 @@ const HomePage = () => {
             onRevisionBackground={handleRevisionBackground}
             downloadUrl={previewUrl}
             layoutValues={values}
-            onLayoutDeltaChange={handlePatchFromChat}
+            onLayoutDeltaChange={handlePatchValues}
             onResetLayout={handleResetLayout}
             layoutOverlayActive={Boolean(previewUrl && hasBackground)}
             layoutOverlay={layoutOverlay}
