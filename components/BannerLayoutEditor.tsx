@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type PointerEvent, useState } from "react";
+import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from "react";
 import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
 import { clampRectWithinBanner, getPreviewScale, toBannerDelta } from "@/lib/layoutDragMath";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
@@ -74,6 +74,7 @@ export const BannerLayoutEditor = ({
 }: BannerLayoutEditorProps) => {
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
   const [liveOffsets, setLiveOffsets] = useState<LiveOffsets>(EMPTY_LIVE_OFFSETS);
+  const phoneAutoFixRef = useRef<string | null>(null);
 
   const { width: bannerPixelWidth, height: bannerPixelHeight } = getBannerDimensions(values.bannerType);
   const L = getBannerLayoutConstants(values.bannerType);
@@ -130,14 +131,41 @@ export const BannerLayoutEditor = ({
       layoutOverlay.phoneGroup.top <= 4 &&
       (expectedPhoneLeft > bannerPixelWidth * 0.25 || expectedPhoneTop > bannerPixelHeight * 0.25)
   );
-  const effectivePhoneRect: LayoutElementRect = hasSuspiciousServerPhoneRect
-    ? {
-        left: expectedPhoneLeft,
-        top: expectedPhoneTop,
-        width: L.LAYOUT_PHONE_REGION_W,
-        height: L.LAYOUT_PHONE_REGION_H
-      }
-    : phoneRect;
+
+  useEffect(() => {
+    if (!hasSuspiciousServerPhoneRect || !layoutOverlay?.phoneGroup) {
+      return;
+    }
+    const signature = [
+      values.layoutPhoneGroupDeltaX,
+      values.layoutPhoneGroupDeltaY,
+      layoutOverlay.phoneGroup.left,
+      layoutOverlay.phoneGroup.top
+    ].join(":");
+    if (phoneAutoFixRef.current === signature) {
+      return;
+    }
+    phoneAutoFixRef.current = signature;
+    const dx = expectedPhoneLeft - layoutOverlay.phoneGroup.left;
+    const dy = expectedPhoneTop - layoutOverlay.phoneGroup.top;
+    if (dx === 0 && dy === 0) {
+      return;
+    }
+    onLayoutDeltaChange({
+      layoutPhoneGroupDeltaX: values.layoutPhoneGroupDeltaX + dx,
+      layoutPhoneGroupDeltaY: values.layoutPhoneGroupDeltaY + dy
+    });
+    onLayoutDragNudge("phone", dx, dy);
+  }, [
+    expectedPhoneLeft,
+    expectedPhoneTop,
+    hasSuspiciousServerPhoneRect,
+    layoutOverlay?.phoneGroup,
+    onLayoutDeltaChange,
+    onLayoutDragNudge,
+    values.layoutPhoneGroupDeltaX,
+    values.layoutPhoneGroupDeltaY
+  ]);
 
   const commitGroupDelta = (group: LayoutDragGroup, dx: number, dy: number) => {
     switch (group) {
@@ -222,7 +250,7 @@ export const BannerLayoutEditor = ({
   const renderedPrimaryRect = primaryRect ? applyDelta(primaryRect, liveOffsets.primary.dx, liveOffsets.primary.dy) : null;
   const renderedSecondaryRect = secondaryRect ? applyDelta(secondaryRect, liveOffsets.secondary.dx, liveOffsets.secondary.dy) : null;
   const renderedTextRect = applyDelta(textRect, liveOffsets.text.dx, liveOffsets.text.dy);
-  const renderedPhoneRect = showPhoneHandle ? applyDelta(effectivePhoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
+  const renderedPhoneRect = showPhoneHandle ? applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -274,7 +302,7 @@ export const BannerLayoutEditor = ({
           aria-label="Drag phone number and icon"
           style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
           onPointerDown={(event) => startDrag(event, "phone")}
-          onPointerMove={(event) => updateDrag(event, "phone", effectivePhoneRect)}
+          onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
           onPointerUp={(event) => stopDrag(event, "phone")}
           onPointerCancel={(event) => cancelDrag(event, "phone")}
         />
