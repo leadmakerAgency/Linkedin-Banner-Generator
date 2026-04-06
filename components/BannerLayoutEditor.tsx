@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent, useState } from "react";
 import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
 import { clampRectWithinBanner, getPreviewScale, toBannerDelta } from "@/lib/layoutDragMath";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
@@ -15,6 +15,8 @@ const applyDelta = (rect: LayoutElementRect, dx: number, dy: number): LayoutElem
     height: rect.height
   };
 };
+
+const clampLayoutDelta = (value: number): number => Math.max(-2000, Math.min(2000, value));
 
 const handleClass =
   "pointer-events-auto absolute z-10 box-border touch-none cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
@@ -74,7 +76,6 @@ export const BannerLayoutEditor = ({
 }: BannerLayoutEditorProps) => {
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
   const [liveOffsets, setLiveOffsets] = useState<LiveOffsets>(EMPTY_LIVE_OFFSETS);
-  const phoneAutoFixRef = useRef<string | null>(null);
 
   const { width: bannerPixelWidth, height: bannerPixelHeight } = getBannerDimensions(values.bannerType);
   const L = getBannerLayoutConstants(values.bannerType);
@@ -131,66 +132,39 @@ export const BannerLayoutEditor = ({
       layoutOverlay.phoneGroup.top <= 4 &&
       (expectedPhoneLeft > bannerPixelWidth * 0.25 || expectedPhoneTop > bannerPixelHeight * 0.25)
   );
-
-  useEffect(() => {
-    if (!hasSuspiciousServerPhoneRect || !layoutOverlay?.phoneGroup) {
-      return;
-    }
-    const signature = [
-      values.layoutPhoneGroupDeltaX,
-      values.layoutPhoneGroupDeltaY,
-      layoutOverlay.phoneGroup.left,
-      layoutOverlay.phoneGroup.top
-    ].join(":");
-    if (phoneAutoFixRef.current === signature) {
-      return;
-    }
-    phoneAutoFixRef.current = signature;
-    const dx = expectedPhoneLeft - layoutOverlay.phoneGroup.left;
-    const dy = expectedPhoneTop - layoutOverlay.phoneGroup.top;
-    if (dx === 0 && dy === 0) {
-      return;
-    }
-    onLayoutDeltaChange({
-      layoutPhoneGroupDeltaX: values.layoutPhoneGroupDeltaX + dx,
-      layoutPhoneGroupDeltaY: values.layoutPhoneGroupDeltaY + dy
-    });
-    onLayoutDragNudge("phone", dx, dy);
-  }, [
-    expectedPhoneLeft,
-    expectedPhoneTop,
-    hasSuspiciousServerPhoneRect,
-    layoutOverlay?.phoneGroup,
-    onLayoutDeltaChange,
-    onLayoutDragNudge,
-    values.layoutPhoneGroupDeltaX,
-    values.layoutPhoneGroupDeltaY
-  ]);
+  const effectivePhoneRect: LayoutElementRect = hasSuspiciousServerPhoneRect
+    ? {
+        left: expectedPhoneLeft,
+        top: expectedPhoneTop,
+        width: L.LAYOUT_PHONE_REGION_W,
+        height: L.LAYOUT_PHONE_REGION_H
+      }
+    : phoneRect;
 
   const commitGroupDelta = (group: LayoutDragGroup, dx: number, dy: number) => {
     switch (group) {
       case "primary":
         onLayoutDeltaChange({
-          layoutPrimaryLogoDeltaX: values.layoutPrimaryLogoDeltaX + dx,
-          layoutPrimaryLogoDeltaY: values.layoutPrimaryLogoDeltaY + dy
+          layoutPrimaryLogoDeltaX: clampLayoutDelta(values.layoutPrimaryLogoDeltaX + dx),
+          layoutPrimaryLogoDeltaY: clampLayoutDelta(values.layoutPrimaryLogoDeltaY + dy)
         });
         break;
       case "secondary":
         onLayoutDeltaChange({
-          layoutSecondaryLogoDeltaX: values.layoutSecondaryLogoDeltaX + dx,
-          layoutSecondaryLogoDeltaY: values.layoutSecondaryLogoDeltaY + dy
+          layoutSecondaryLogoDeltaX: clampLayoutDelta(values.layoutSecondaryLogoDeltaX + dx),
+          layoutSecondaryLogoDeltaY: clampLayoutDelta(values.layoutSecondaryLogoDeltaY + dy)
         });
         break;
       case "text":
         onLayoutDeltaChange({
-          layoutTextBlockDeltaX: values.layoutTextBlockDeltaX + dx,
-          layoutTextBlockDeltaY: values.layoutTextBlockDeltaY + dy
+          layoutTextBlockDeltaX: clampLayoutDelta(values.layoutTextBlockDeltaX + dx),
+          layoutTextBlockDeltaY: clampLayoutDelta(values.layoutTextBlockDeltaY + dy)
         });
         break;
       case "phone":
         onLayoutDeltaChange({
-          layoutPhoneGroupDeltaX: values.layoutPhoneGroupDeltaX + dx,
-          layoutPhoneGroupDeltaY: values.layoutPhoneGroupDeltaY + dy
+          layoutPhoneGroupDeltaX: clampLayoutDelta(values.layoutPhoneGroupDeltaX + dx),
+          layoutPhoneGroupDeltaY: clampLayoutDelta(values.layoutPhoneGroupDeltaY + dy)
         });
         break;
       default:
@@ -250,7 +224,7 @@ export const BannerLayoutEditor = ({
   const renderedPrimaryRect = primaryRect ? applyDelta(primaryRect, liveOffsets.primary.dx, liveOffsets.primary.dy) : null;
   const renderedSecondaryRect = secondaryRect ? applyDelta(secondaryRect, liveOffsets.secondary.dx, liveOffsets.secondary.dy) : null;
   const renderedTextRect = applyDelta(textRect, liveOffsets.text.dx, liveOffsets.text.dy);
-  const renderedPhoneRect = showPhoneHandle ? applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
+  const renderedPhoneRect = showPhoneHandle ? applyDelta(effectivePhoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -302,7 +276,7 @@ export const BannerLayoutEditor = ({
           aria-label="Drag phone number and icon"
           style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
           onPointerDown={(event) => startDrag(event, "phone")}
-          onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
+          onPointerMove={(event) => updateDrag(event, "phone", effectivePhoneRect)}
           onPointerUp={(event) => stopDrag(event, "phone")}
           onPointerCancel={(event) => cancelDrag(event, "phone")}
         />
