@@ -122,6 +122,22 @@ export const BannerLayoutEditor = ({
     height: L.LAYOUT_PHONE_REGION_H
   };
   const showPhoneHandle = values.phoneNumber.trim().length > 0;
+  const expectedPhoneLeft = L.LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX;
+  const expectedPhoneTop = L.LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY;
+  const hasSuspiciousServerPhoneRect = Boolean(
+    layoutOverlay?.phoneGroup &&
+      layoutOverlay.phoneGroup.left <= 4 &&
+      layoutOverlay.phoneGroup.top <= 4 &&
+      (expectedPhoneLeft > bannerPixelWidth * 0.25 || expectedPhoneTop > bannerPixelHeight * 0.25)
+  );
+  const effectivePhoneRect: LayoutElementRect = hasSuspiciousServerPhoneRect
+    ? {
+        left: expectedPhoneLeft,
+        top: expectedPhoneTop,
+        width: L.LAYOUT_PHONE_REGION_W,
+        height: L.LAYOUT_PHONE_REGION_H
+      }
+    : phoneRect;
 
   const commitGroupDelta = (group: LayoutDragGroup, dx: number, dy: number) => {
     switch (group) {
@@ -206,7 +222,7 @@ export const BannerLayoutEditor = ({
   const renderedPrimaryRect = primaryRect ? applyDelta(primaryRect, liveOffsets.primary.dx, liveOffsets.primary.dy) : null;
   const renderedSecondaryRect = secondaryRect ? applyDelta(secondaryRect, liveOffsets.secondary.dx, liveOffsets.secondary.dy) : null;
   const renderedTextRect = applyDelta(textRect, liveOffsets.text.dx, liveOffsets.text.dy);
-  const renderedPhoneRect = showPhoneHandle ? applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
+  const renderedPhoneRect = showPhoneHandle ? applyDelta(effectivePhoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy) : null;
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -258,7 +274,7 @@ export const BannerLayoutEditor = ({
           aria-label="Drag phone number and icon"
           style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
           onPointerDown={(event) => startDrag(event, "phone")}
-          onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
+          onPointerMove={(event) => updateDrag(event, "phone", effectivePhoneRect)}
           onPointerUp={(event) => stopDrag(event, "phone")}
           onPointerCancel={(event) => cancelDrag(event, "phone")}
         />

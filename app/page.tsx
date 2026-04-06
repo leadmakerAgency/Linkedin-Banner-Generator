@@ -178,8 +178,9 @@ const HomePage = () => {
       formData.set("primaryBrandColor", v.primaryBrandColor);
       formData.set("secondaryBrandColor", v.secondaryBrandColor);
       formData.set("phoneNumber", phoneNumber);
-      formData.set("phoneIconOffsetX", String(v.phoneIconOffsetX));
-      formData.set("phoneIconOffsetY", String(v.phoneIconOffsetY));
+      // Keep phone row perfectly horizontal and stable as one group.
+      formData.set("phoneIconOffsetX", "0");
+      formData.set("phoneIconOffsetY", "0");
       formData.set("layoutPrimaryLogoDeltaX", String(v.layoutPrimaryLogoDeltaX));
       formData.set("layoutPrimaryLogoDeltaY", String(v.layoutPrimaryLogoDeltaY));
       formData.set("layoutSecondaryLogoDeltaX", String(v.layoutSecondaryLogoDeltaX));
