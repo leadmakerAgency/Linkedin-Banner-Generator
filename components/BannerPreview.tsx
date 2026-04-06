@@ -1,7 +1,8 @@
 "use client";
-import { BannerLayoutEditor } from "@/components/BannerLayoutEditor";
+import { type PreviewViewport, BannerLayoutEditor } from "@/components/BannerLayoutEditor";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import { getBannerDimensions, type BannerFormValues, type LayoutOverlayPayload, type RevisionAction } from "@/types/banner";
+import { useLayoutEffect, useRef, useState } from "react";
 
 interface BannerPreviewProps {
   /** Merged preview when overlay has rendered; may be background-only until first overlay completes. */
@@ -51,6 +52,51 @@ export const BannerPreview = ({
   hasSecondaryLogo
 }: BannerPreviewProps) => {
   const { width: exportW, height: exportH } = getBannerDimensions(layoutValues.bannerType);
+  const previewFrameRef = useRef<HTMLDivElement>(null);
+  const [previewViewport, setPreviewViewport] = useState<PreviewViewport>({
+    width: exportW,
+    height: exportH,
+    offsetX: 0,
+    offsetY: 0
+  });
+
+  useLayoutEffect(() => {
+    const frame = previewFrameRef.current;
+    if (!frame) {
+      return;
+    }
+    const bannerAspect = exportW / exportH;
+    const updateViewport = () => {
+      const bounds = frame.getBoundingClientRect();
+      const frameWidth = bounds.width;
+      const frameHeight = bounds.height;
+      if (frameWidth <= 0 || frameHeight <= 0) {
+        return;
+      }
+      const frameAspect = frameWidth / frameHeight;
+      if (frameAspect > bannerAspect) {
+        const fittedWidth = frameHeight * bannerAspect;
+        setPreviewViewport({
+          width: fittedWidth,
+          height: frameHeight,
+          offsetX: (frameWidth - fittedWidth) / 2,
+          offsetY: 0
+        });
+        return;
+      }
+      const fittedHeight = frameWidth / bannerAspect;
+      setPreviewViewport({
+        width: frameWidth,
+        height: fittedHeight,
+        offsetX: 0,
+        offsetY: (frameHeight - fittedHeight) / 2
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [exportH, exportW]);
 
   return (
     <section className="rounded-2xl border border-slate-800/90 bg-slate-900/75 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl" aria-live="polite">
@@ -87,6 +133,7 @@ export const BannerPreview = ({
       </div>
 
       <div
+        ref={previewFrameRef}
         className="relative mb-5 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/80 shadow-inner"
         style={{ aspectRatio: `${exportW} / ${exportH}` }}
       >
@@ -106,6 +153,7 @@ export const BannerPreview = ({
                 onLayoutDragNudge={onLayoutDragNudge}
                 hasPrimaryLogo={hasPrimaryLogo}
                 hasSecondaryLogo={hasSecondaryLogo}
+                previewViewport={previewViewport}
               />
             ) : null}
           </>

@@ -1,41 +1,57 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import Draggable, { type DraggableData, type DraggableEvent } from "react-draggable";
+import { type CSSProperties, type PointerEvent, useState } from "react";
 import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
+import { clampByDeltaLimits, clampRectWithinBanner, getPreviewScale, toBannerDelta } from "@/lib/layoutDragMath";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { BannerFormValues, LayoutElementRect, LayoutOverlayPayload } from "@/types/banner";
 import { getBannerDimensions } from "@/types/banner";
 
-const clampDelta = (value: number): number => Math.max(-400, Math.min(400, value));
-
-/** Preview CSS px → banner px: read container width at pointer-up so commits never use a stale scale. */
-const getCommitScale = (
-  container: HTMLDivElement | null,
-  bannerPixelWidth: number,
-  fallback: number
-): number => {
-  if (!container) {
-    return fallback > 0 ? fallback : 1;
-  }
-  const w = container.getBoundingClientRect().width;
-  if (w <= 0) {
-    return fallback > 0 ? fallback : 1;
-  }
-  return w / bannerPixelWidth;
+const applyDelta = (rect: LayoutElementRect, dx: number, dy: number): LayoutElementRect => {
+  return {
+    left: rect.left + dx,
+    top: rect.top + dy,
+    width: rect.width,
+    height: rect.height
+  };
 };
 
 const handleClass =
-  "pointer-events-auto absolute z-10 box-border cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
+  "pointer-events-auto absolute z-10 box-border touch-none cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
 
-const rectToStyle = (rect: LayoutElementRect, scale: number) => ({
-  left: rect.left * scale,
-  top: rect.top * scale,
+const rectToStyle = (
+  rect: LayoutElementRect,
+  scale: number,
+  offsetX: number,
+  offsetY: number
+): CSSProperties => ({
+  left: offsetX + rect.left * scale,
+  top: offsetY + rect.top * scale,
   width: rect.width * scale,
   height: rect.height * scale
 });
 
-type DragPos = { x: number; y: number };
+type LiveDelta = { dx: number; dy: number };
+type LiveOffsets = Record<LayoutDragGroup, LiveDelta>;
+type ActiveDragState = {
+  group: LayoutDragGroup;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+};
+export type PreviewViewport = {
+  width: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+const EMPTY_LIVE_OFFSETS: LiveOffsets = {
+  primary: { dx: 0, dy: 0 },
+  secondary: { dx: 0, dy: 0 },
+  text: { dx: 0, dy: 0 },
+  phone: { dx: 0, dy: 0 }
+};
 
 interface BannerLayoutEditorProps {
   values: BannerFormValues;
@@ -44,6 +60,7 @@ interface BannerLayoutEditorProps {
   onLayoutDragNudge: (group: LayoutDragGroup, dxBanner: number, dyBanner: number) => void;
   hasPrimaryLogo: boolean;
   hasSecondaryLogo: boolean;
+  previewViewport: PreviewViewport;
 }
 
 export const BannerLayoutEditor = ({
@@ -52,62 +69,44 @@ export const BannerLayoutEditor = ({
   onLayoutDeltaChange,
   onLayoutDragNudge,
   hasPrimaryLogo,
-  hasSecondaryLogo
+  hasSecondaryLogo,
+  previewViewport
 }: BannerLayoutEditorProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const primaryRef = useRef<HTMLDivElement>(null);
-  const secondaryRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLDivElement>(null);
-  const phoneRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  const [primaryDrag, setPrimaryDrag] = useState<DragPos>({ x: 0, y: 0 });
-  const [secondaryDrag, setSecondaryDrag] = useState<DragPos>({ x: 0, y: 0 });
-  const [textDrag, setTextDrag] = useState<DragPos>({ x: 0, y: 0 });
-  const [phoneDrag, setPhoneDrag] = useState<DragPos>({ x: 0, y: 0 });
+  const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
+  const [liveOffsets, setLiveOffsets] = useState<LiveOffsets>(EMPTY_LIVE_OFFSETS);
 
-  const bannerPixelWidth = getBannerDimensions(values.bannerType).width;
+  const { width: bannerPixelWidth, height: bannerPixelHeight } = getBannerDimensions(values.bannerType);
   const L = getBannerLayoutConstants(values.bannerType);
+  const previewScale = getPreviewScale(previewViewport.width, bannerPixelWidth);
 
-  useLayoutEffect(() => {
-    const element = containerRef.current;
-    if (!element) {
-      return;
-    }
-    const update = () => {
-      const width = element.getBoundingClientRect().width;
-      if (width > 0) {
-        setScale(width / bannerPixelWidth);
-      }
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [bannerPixelWidth, values.bannerType]);
+  const setLiveOffset = (group: LayoutDragGroup, next: LiveDelta) => {
+    setLiveOffsets((previous) => ({
+      ...previous,
+      [group]: next
+    }));
+  };
 
-  const s = scale;
+  const clearLiveOffset = (group: LayoutDragGroup) => {
+    setLiveOffset(group, { dx: 0, dy: 0 });
+  };
 
   const primaryRect: LayoutElementRect | null = !hasPrimaryLogo
     ? null
-    : layoutOverlay
-      ? layoutOverlay.primaryLogo
-      : {
-          left: L.LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX,
-          top: L.LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY,
-          width: L.LAYOUT_PRIMARY_LOGO_BOX,
-          height: L.LAYOUT_PRIMARY_LOGO_BOX
-        };
+    : (layoutOverlay?.primaryLogo ?? {
+        left: L.LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX,
+        top: L.LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY,
+        width: L.LAYOUT_PRIMARY_LOGO_BOX,
+        height: L.LAYOUT_PRIMARY_LOGO_BOX
+      });
 
   const secondaryRect: LayoutElementRect | null = !hasSecondaryLogo
     ? null
-    : layoutOverlay
-      ? layoutOverlay.secondaryLogo
-      : {
-          left: L.LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX,
-          top: L.LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY,
-          width: L.LAYOUT_SECONDARY_LOGO_BOX,
-          height: L.LAYOUT_SECONDARY_LOGO_BOX
-        };
+    : (layoutOverlay?.secondaryLogo ?? {
+        left: L.LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX,
+        top: L.LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY,
+        width: L.LAYOUT_SECONDARY_LOGO_BOX,
+        height: L.LAYOUT_SECONDARY_LOGO_BOX
+      });
 
   const textRect: LayoutElementRect = layoutOverlay?.textBlock ?? {
     left: L.LAYOUT_TEXT_BLOCK_LEFT + values.layoutTextBlockDeltaX,
@@ -116,182 +115,151 @@ export const BannerLayoutEditor = ({
     height: L.LAYOUT_TEXT_BLOCK_HEIGHT
   };
 
-  const phoneRect: LayoutElementRect | null = layoutOverlay
-    ? layoutOverlay.phoneGroup
-    : {
-        left: L.LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX,
-        top: L.LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY,
-        width: L.LAYOUT_PHONE_REGION_W,
-        height: L.LAYOUT_PHONE_REGION_H
-      };
+  const phoneRect: LayoutElementRect = layoutOverlay?.phoneGroup ?? {
+    left: L.LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX,
+    top: L.LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY,
+    width: L.LAYOUT_PHONE_REGION_W,
+    height: L.LAYOUT_PHONE_REGION_H
+  };
 
-  const handlePrimaryStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
-      const dx = Math.round(data.x / commitScale);
-      const dy = Math.round(data.y / commitScale);
-      onLayoutDeltaChange({
-        layoutPrimaryLogoDeltaX: clampDelta(values.layoutPrimaryLogoDeltaX + dx),
-        layoutPrimaryLogoDeltaY: clampDelta(values.layoutPrimaryLogoDeltaY + dy)
-      });
-      onLayoutDragNudge("primary", dx, dy);
-      setPrimaryDrag({ x: 0, y: 0 });
-    },
-    [
-      bannerPixelWidth,
-      onLayoutDeltaChange,
-      onLayoutDragNudge,
-      s,
-      values.layoutPrimaryLogoDeltaX,
-      values.layoutPrimaryLogoDeltaY
-    ]
-  );
+  const commitGroupDelta = (group: LayoutDragGroup, dx: number, dy: number) => {
+    switch (group) {
+      case "primary":
+        onLayoutDeltaChange({
+          layoutPrimaryLogoDeltaX: clampByDeltaLimits(values.layoutPrimaryLogoDeltaX + dx),
+          layoutPrimaryLogoDeltaY: clampByDeltaLimits(values.layoutPrimaryLogoDeltaY + dy)
+        });
+        break;
+      case "secondary":
+        onLayoutDeltaChange({
+          layoutSecondaryLogoDeltaX: clampByDeltaLimits(values.layoutSecondaryLogoDeltaX + dx),
+          layoutSecondaryLogoDeltaY: clampByDeltaLimits(values.layoutSecondaryLogoDeltaY + dy)
+        });
+        break;
+      case "text":
+        onLayoutDeltaChange({
+          layoutTextBlockDeltaX: clampByDeltaLimits(values.layoutTextBlockDeltaX + dx),
+          layoutTextBlockDeltaY: clampByDeltaLimits(values.layoutTextBlockDeltaY + dy)
+        });
+        break;
+      case "phone":
+        onLayoutDeltaChange({
+          layoutPhoneGroupDeltaX: clampByDeltaLimits(values.layoutPhoneGroupDeltaX + dx),
+          layoutPhoneGroupDeltaY: clampByDeltaLimits(values.layoutPhoneGroupDeltaY + dy)
+        });
+        break;
+      default:
+        return;
+    }
+    onLayoutDragNudge(group, dx, dy);
+  };
 
-  const handleSecondaryStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
-      const dx = Math.round(data.x / commitScale);
-      const dy = Math.round(data.y / commitScale);
-      onLayoutDeltaChange({
-        layoutSecondaryLogoDeltaX: clampDelta(values.layoutSecondaryLogoDeltaX + dx),
-        layoutSecondaryLogoDeltaY: clampDelta(values.layoutSecondaryLogoDeltaY + dy)
-      });
-      onLayoutDragNudge("secondary", dx, dy);
-      setSecondaryDrag({ x: 0, y: 0 });
-    },
-    [
-      bannerPixelWidth,
-      onLayoutDeltaChange,
-      onLayoutDragNudge,
-      s,
-      values.layoutSecondaryLogoDeltaX,
-      values.layoutSecondaryLogoDeltaY
-    ]
-  );
+  const startDrag = (event: PointerEvent<HTMLDivElement>, group: LayoutDragGroup) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setActiveDrag({
+      group,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY
+    });
+    setLiveOffset(group, { dx: 0, dy: 0 });
+  };
 
-  const handleTextStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
-      const dx = Math.round(data.x / commitScale);
-      const dy = Math.round(data.y / commitScale);
-      onLayoutDeltaChange({
-        layoutTextBlockDeltaX: clampDelta(values.layoutTextBlockDeltaX + dx),
-        layoutTextBlockDeltaY: clampDelta(values.layoutTextBlockDeltaY + dy)
-      });
-      onLayoutDragNudge("text", dx, dy);
-      setTextDrag({ x: 0, y: 0 });
-    },
-    [
-      bannerPixelWidth,
-      onLayoutDeltaChange,
-      onLayoutDragNudge,
-      s,
-      values.layoutTextBlockDeltaX,
-      values.layoutTextBlockDeltaY
-    ]
-  );
+  const updateDrag = (event: PointerEvent<HTMLDivElement>, group: LayoutDragGroup, rect: LayoutElementRect) => {
+    if (!activeDrag || activeDrag.group !== group || activeDrag.pointerId !== event.pointerId) {
+      return;
+    }
 
-  const handlePhoneStop = useCallback(
-    (_e: DraggableEvent, data: DraggableData) => {
-      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
-      const dx = Math.round(data.x / commitScale);
-      const dy = Math.round(data.y / commitScale);
-      onLayoutDeltaChange({
-        layoutPhoneGroupDeltaX: clampDelta(values.layoutPhoneGroupDeltaX + dx),
-        layoutPhoneGroupDeltaY: clampDelta(values.layoutPhoneGroupDeltaY + dy)
-      });
-      onLayoutDragNudge("phone", dx, dy);
-      setPhoneDrag({ x: 0, y: 0 });
-    },
-    [
-      bannerPixelWidth,
-      onLayoutDeltaChange,
-      onLayoutDragNudge,
-      s,
-      values.layoutPhoneGroupDeltaX,
-      values.layoutPhoneGroupDeltaY
-    ]
-  );
+    const { dxBanner, dyBanner } = toBannerDelta(
+      event.clientX - activeDrag.startClientX,
+      event.clientY - activeDrag.startClientY,
+      previewScale
+    );
+    const clamped = clampRectWithinBanner(rect, dxBanner, dyBanner, bannerPixelWidth, bannerPixelHeight);
+    setLiveOffset(group, { dx: clamped.dxBanner, dy: clamped.dyBanner });
+  };
+
+  const stopDrag = (event: PointerEvent<HTMLDivElement>, group: LayoutDragGroup) => {
+    if (!activeDrag || activeDrag.group !== group || activeDrag.pointerId !== event.pointerId) {
+      return;
+    }
+    const offset = liveOffsets[group];
+    if (offset.dx !== 0 || offset.dy !== 0) {
+      commitGroupDelta(group, offset.dx, offset.dy);
+    }
+    clearLiveOffset(group);
+    setActiveDrag(null);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const cancelDrag = (event: PointerEvent<HTMLDivElement>, group: LayoutDragGroup) => {
+    if (!activeDrag || activeDrag.group !== group || activeDrag.pointerId !== event.pointerId) {
+      return;
+    }
+    clearLiveOffset(group);
+    setActiveDrag(null);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const renderedPrimaryRect = primaryRect ? applyDelta(primaryRect, liveOffsets.primary.dx, liveOffsets.primary.dy) : null;
+  const renderedSecondaryRect = secondaryRect ? applyDelta(secondaryRect, liveOffsets.secondary.dx, liveOffsets.secondary.dy) : null;
+  const renderedTextRect = applyDelta(textRect, liveOffsets.text.dx, liveOffsets.text.dy);
+  const renderedPhoneRect = applyDelta(phoneRect, liveOffsets.phone.dx, liveOffsets.phone.dy);
 
   return (
-    <div ref={containerRef} className="pointer-events-none absolute inset-0">
-      {primaryRect ? (
-        <Draggable
-          nodeRef={primaryRef}
-          bounds="parent"
-          position={primaryDrag}
-          scale={1}
-          onDrag={(_e, data) => setPrimaryDrag({ x: data.x, y: data.y })}
-          onStop={handlePrimaryStop}
-        >
-          <div
-            ref={primaryRef}
-            role="button"
-            tabIndex={0}
-            aria-label="Drag primary logo"
-            className={handleClass}
-            style={rectToStyle(primaryRect, s)}
-          />
-        </Draggable>
-      ) : null}
-
-      {secondaryRect ? (
-        <Draggable
-          nodeRef={secondaryRef}
-          bounds="parent"
-          position={secondaryDrag}
-          scale={1}
-          onDrag={(_e, data) => setSecondaryDrag({ x: data.x, y: data.y })}
-          onStop={handleSecondaryStop}
-        >
-          <div
-            ref={secondaryRef}
-            role="button"
-            tabIndex={0}
-            aria-label="Drag secondary logo"
-            className={handleClass}
-            style={rectToStyle(secondaryRect, s)}
-          />
-        </Draggable>
-      ) : null}
-
-      <Draggable
-        nodeRef={textRef}
-        bounds="parent"
-        position={textDrag}
-        scale={1}
-        onDrag={(_e, data) => setTextDrag({ x: data.x, y: data.y })}
-        onStop={handleTextStop}
-      >
+    <div className="pointer-events-none absolute inset-0">
+      {renderedPrimaryRect ? (
         <div
-          ref={textRef}
+          className={handleClass}
           role="button"
           tabIndex={0}
-          aria-label="Drag title and description text block"
-          className={handleClass}
-          style={rectToStyle(textRect, s)}
+          aria-label="Drag primary logo"
+          style={rectToStyle(renderedPrimaryRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
+          onPointerDown={(event) => startDrag(event, "primary")}
+          onPointerMove={(event) => updateDrag(event, "primary", primaryRect!)}
+          onPointerUp={(event) => stopDrag(event, "primary")}
+          onPointerCancel={(event) => cancelDrag(event, "primary")}
         />
-      </Draggable>
-
-      {phoneRect ? (
-        <Draggable
-          nodeRef={phoneRef}
-          bounds="parent"
-          position={phoneDrag}
-          scale={1}
-          onDrag={(_e, data) => setPhoneDrag({ x: data.x, y: data.y })}
-          onStop={handlePhoneStop}
-        >
-          <div
-            ref={phoneRef}
-            role="button"
-            tabIndex={0}
-            aria-label="Drag phone number and icon"
-            className={handleClass}
-            style={rectToStyle(phoneRect, s)}
-          />
-        </Draggable>
       ) : null}
+
+      {renderedSecondaryRect ? (
+        <div
+          className={handleClass}
+          role="button"
+          tabIndex={0}
+          aria-label="Drag secondary logo"
+          style={rectToStyle(renderedSecondaryRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
+          onPointerDown={(event) => startDrag(event, "secondary")}
+          onPointerMove={(event) => updateDrag(event, "secondary", secondaryRect!)}
+          onPointerUp={(event) => stopDrag(event, "secondary")}
+          onPointerCancel={(event) => cancelDrag(event, "secondary")}
+        />
+      ) : null}
+
+      <div
+        className={handleClass}
+        role="button"
+        tabIndex={0}
+        aria-label="Drag title and description text block"
+        style={rectToStyle(renderedTextRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
+        onPointerDown={(event) => startDrag(event, "text")}
+        onPointerMove={(event) => updateDrag(event, "text", textRect)}
+        onPointerUp={(event) => stopDrag(event, "text")}
+        onPointerCancel={(event) => cancelDrag(event, "text")}
+      />
+
+      <div
+        className={handleClass}
+        role="button"
+        tabIndex={0}
+        aria-label="Drag phone number and icon"
+        style={rectToStyle(renderedPhoneRect, previewScale, previewViewport.offsetX, previewViewport.offsetY)}
+        onPointerDown={(event) => startDrag(event, "phone")}
+        onPointerMove={(event) => updateDrag(event, "phone", phoneRect)}
+        onPointerUp={(event) => stopDrag(event, "phone")}
+        onPointerCancel={(event) => cancelDrag(event, "phone")}
+      />
     </div>
   );
 };
