@@ -10,7 +10,6 @@ import {
   BannerFormValues,
   BannerType,
   DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE,
-  RevisionAction,
   getBannerDimensions
 } from "@/types/banner";
 
@@ -168,7 +167,7 @@ const HomePage = () => {
   ].join(" ");
 
   const handleBuildFormData = useCallback(
-    (revisionAction?: RevisionAction, forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
+    (forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
       const v = withClampedLayout(sourceValues ?? values);
       const companyName = v.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
       const companyDescription = v.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
@@ -212,9 +211,6 @@ const HomePage = () => {
       if (files.secondaryLogo) {
         formData.set("secondaryLogo", files.secondaryLogo);
       }
-      if (revisionAction) {
-        formData.set("revisionAction", revisionAction);
-      }
       if (forceFresh) {
         formData.set("regenerateNonce", generateNonce());
       }
@@ -226,7 +222,6 @@ const HomePage = () => {
 
   const handleBackgroundRequest = async (
     endpoint: "/api/generate-background" | "/api/revise",
-    revisionAction?: RevisionAction,
     forceFresh?: boolean,
     sourceValues?: BannerFormValues
   ) => {
@@ -246,7 +241,7 @@ const HomePage = () => {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        body: handleBuildFormData(revisionAction, forceFresh, sourceValues)
+        body: handleBuildFormData(forceFresh, sourceValues)
       });
       const data = (await response.json()) as { backgroundUrl?: string; imageUrl?: string; error?: string };
 
@@ -275,18 +270,14 @@ const HomePage = () => {
     const resetValues = withDefaultLayout(values);
     setValues(resetValues);
     setLayoutOverlay(null);
-    void handleBackgroundRequest("/api/generate-background", undefined, true, resetValues);
+    void handleBackgroundRequest("/api/generate-background", true, resetValues);
   };
 
   const handleRegenerateBackground = () => {
     const resetValues = withDefaultLayout(values);
     setValues(resetValues);
     setLayoutOverlay(null);
-    void handleBackgroundRequest("/api/generate-background", undefined, true, resetValues);
-  };
-
-  const handleRevisionBackground = (action: RevisionAction) => {
-    void handleBackgroundRequest("/api/revise", action, false);
+    void handleBackgroundRequest("/api/generate-background", true, resetValues);
   };
 
   const handlePatchValues = (patch: Partial<BannerFormValues>) => {
@@ -477,7 +468,6 @@ const HomePage = () => {
             isLoadingOverlay={isLoadingOverlay}
             loadingProgress={loadingProgress}
             onRegenerateBackground={handleRegenerateBackground}
-            onRevisionBackground={handleRevisionBackground}
             downloadUrl={previewUrl}
             layoutValues={values}
             onLayoutDeltaChange={handlePatchValues}

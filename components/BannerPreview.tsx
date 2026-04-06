@@ -1,7 +1,7 @@
 "use client";
 import { type PreviewViewport, BannerLayoutEditor } from "@/components/BannerLayoutEditor";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
-import { getBannerDimensions, type BannerFormValues, type LayoutOverlayPayload, type RevisionAction } from "@/types/banner";
+import { getBannerDimensions, type BannerFormValues, type LayoutOverlayPayload } from "@/types/banner";
 import { useLayoutEffect, useRef, useState } from "react";
 
 interface BannerPreviewProps {
@@ -12,7 +12,6 @@ interface BannerPreviewProps {
   isLoadingOverlay: boolean;
   loadingProgress: number;
   onRegenerateBackground: () => void;
-  onRevisionBackground: (action: RevisionAction) => void;
   /** Final merged PNG for download; disabled until overlay render exists. */
   downloadUrl: string | null;
   layoutValues: BannerFormValues;
@@ -25,14 +24,6 @@ interface BannerPreviewProps {
   hasSecondaryLogo: boolean;
 }
 
-const revisionActions: Array<{ value: RevisionAction; label: string }> = [
-  { value: "move-left", label: "Move Left" },
-  { value: "more-premium", label: "More Premium" },
-  { value: "reduce-clutter", label: "Reduce Clutter" },
-  { value: "make-logo-bigger", label: "Make Logo Bigger" },
-  { value: "change-phone-placement", label: "Change Phone Placement" }
-];
-
 export const BannerPreview = ({
   displayUrl,
   hasBackground,
@@ -40,7 +31,6 @@ export const BannerPreview = ({
   isLoadingOverlay,
   loadingProgress,
   onRegenerateBackground,
-  onRevisionBackground,
   downloadUrl,
   layoutValues,
   onLayoutDeltaChange,
@@ -185,20 +175,6 @@ export const BannerPreview = ({
           />
         </div>
       ) : null}
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {revisionActions.map((action) => (
-          <button
-            key={action.value}
-            type="button"
-            onClick={() => onRevisionBackground(action.value)}
-            disabled={isLoadingBackground || !hasBackground}
-            className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
 
       {downloadUrl ? (
         <a

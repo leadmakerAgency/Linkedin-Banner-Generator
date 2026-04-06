@@ -34,8 +34,8 @@ const buildPersonalLayout = (): BannerLayoutConstants => {
   const contentStartX = Math.round(w * 0.3) + 24;
   const titleY = Math.round(h * 0.46);
   const secondaryPad = 26;
-  const primaryBox = 88;
-  const secondaryBox = 72;
+  const primaryBox = 118;
+  const secondaryBox = 96;
   const phoneW = 300;
   const phoneH = 64;
   const phonePadRight = 12;
@@ -67,8 +67,8 @@ const buildCorporateLayout = (): BannerLayoutConstants => {
   const contentStartX = Math.round(w * 0.3) + Math.round((24 * w) / PERSONAL_BANNER_WIDTH);
   const titleY = Math.round(h * 0.46);
   const secondaryPad = Math.max(14, Math.round((26 * w) / PERSONAL_BANNER_WIDTH));
-  const primaryBox = Math.max(36, Math.round((88 * h) / PERSONAL_BANNER_HEIGHT));
-  const secondaryBox = Math.max(32, Math.round((72 * h) / PERSONAL_BANNER_HEIGHT));
+  const primaryBox = Math.max(42, Math.round((118 * h) / PERSONAL_BANNER_HEIGHT));
+  const secondaryBox = Math.max(36, Math.round((96 * h) / PERSONAL_BANNER_HEIGHT));
   const phoneW = Math.min(Math.round((300 * w) / PERSONAL_BANNER_WIDTH), Math.floor(w * 0.42));
   const phoneH = Math.min(Math.round((64 * h) / PERSONAL_BANNER_HEIGHT), Math.floor(h * 0.24));
   const phonePadRight = Math.max(6, Math.round((12 * w) / PERSONAL_BANNER_WIDTH));
