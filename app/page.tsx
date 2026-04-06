@@ -102,6 +102,20 @@ const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
   layoutPhoneGroupDeltaY: 0
 });
 
+const clampLayoutDelta = (value: number): number => Math.max(-2000, Math.min(2000, value));
+
+const withClampedLayout = (base: BannerFormValues): BannerFormValues => ({
+  ...base,
+  layoutPrimaryLogoDeltaX: clampLayoutDelta(base.layoutPrimaryLogoDeltaX),
+  layoutPrimaryLogoDeltaY: clampLayoutDelta(base.layoutPrimaryLogoDeltaY),
+  layoutSecondaryLogoDeltaX: clampLayoutDelta(base.layoutSecondaryLogoDeltaX),
+  layoutSecondaryLogoDeltaY: clampLayoutDelta(base.layoutSecondaryLogoDeltaY),
+  layoutTextBlockDeltaX: clampLayoutDelta(base.layoutTextBlockDeltaX),
+  layoutTextBlockDeltaY: clampLayoutDelta(base.layoutTextBlockDeltaY),
+  layoutPhoneGroupDeltaX: clampLayoutDelta(base.layoutPhoneGroupDeltaX),
+  layoutPhoneGroupDeltaY: clampLayoutDelta(base.layoutPhoneGroupDeltaY)
+});
+
 const HomePage = () => {
   const [values, setValues] = useState<BannerFormValues>(INITIAL_VALUES);
   const [files, setFiles] = useState<BannerFiles>(INITIAL_FILES);
@@ -155,7 +169,7 @@ const HomePage = () => {
 
   const handleBuildFormData = useCallback(
     (revisionAction?: RevisionAction, forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
-      const v = sourceValues ?? values;
+      const v = withClampedLayout(sourceValues ?? values);
       const companyName = v.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
       const companyDescription = v.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
       const phoneNumber = v.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
@@ -304,6 +318,22 @@ const HomePage = () => {
   useEffect(() => {
     setPromptSnapshot(generatedPrompt);
   }, [generatedPrompt]);
+
+  useEffect(() => {
+    setValues((previous) => {
+      const clamped = withClampedLayout(previous);
+      const unchanged =
+        clamped.layoutPrimaryLogoDeltaX === previous.layoutPrimaryLogoDeltaX &&
+        clamped.layoutPrimaryLogoDeltaY === previous.layoutPrimaryLogoDeltaY &&
+        clamped.layoutSecondaryLogoDeltaX === previous.layoutSecondaryLogoDeltaX &&
+        clamped.layoutSecondaryLogoDeltaY === previous.layoutSecondaryLogoDeltaY &&
+        clamped.layoutTextBlockDeltaX === previous.layoutTextBlockDeltaX &&
+        clamped.layoutTextBlockDeltaY === previous.layoutTextBlockDeltaY &&
+        clamped.layoutPhoneGroupDeltaX === previous.layoutPhoneGroupDeltaX &&
+        clamped.layoutPhoneGroupDeltaY === previous.layoutPhoneGroupDeltaY;
+      return unchanged ? previous : clamped;
+    });
+  }, []);
 
   useEffect(() => {
     if (previousBannerType.current === null) {
