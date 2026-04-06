@@ -2,25 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Draggable, { type DraggableData, type DraggableEvent } from "react-draggable";
-import {
-  LAYOUT_LOGO_TOP,
-  LAYOUT_MARGIN,
-  LAYOUT_PHONE_REGION_H,
-  LAYOUT_PHONE_REGION_LEFT,
-  LAYOUT_PHONE_REGION_TOP,
-  LAYOUT_PHONE_REGION_W,
-  LAYOUT_PRIMARY_LOGO_BOX,
-  LAYOUT_SECONDARY_LOGO_BOX,
-  LAYOUT_SECONDARY_LOGO_LEFT,
-  LAYOUT_SECONDARY_LOGO_TOP,
-  LAYOUT_TEXT_BLOCK_HEIGHT,
-  LAYOUT_TEXT_BLOCK_LEFT,
-  LAYOUT_TEXT_BLOCK_TOP,
-  LAYOUT_TEXT_BLOCK_WIDTH
-} from "@/lib/bannerLayoutConstants";
+import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { BannerFormValues, LayoutElementRect, LayoutOverlayPayload } from "@/types/banner";
-import { BANNER_WIDTH } from "@/types/banner";
+import { getBannerDimensions } from "@/types/banner";
 
 const clampDelta = (value: number): number => Math.max(-400, Math.min(400, value));
 
@@ -58,6 +43,9 @@ export const BannerLayoutEditor = ({
   const phoneRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
+  const bannerPixelWidth = getBannerDimensions(values.bannerType).width;
+  const L = getBannerLayoutConstants(values.bannerType);
+
   useEffect(() => {
     const element = containerRef.current;
     if (!element) {
@@ -66,14 +54,14 @@ export const BannerLayoutEditor = ({
     const update = () => {
       const width = element.getBoundingClientRect().width;
       if (width > 0) {
-        setScale(width / BANNER_WIDTH);
+        setScale(width / bannerPixelWidth);
       }
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [bannerPixelWidth, values.bannerType]);
 
   const s = scale;
 
@@ -82,10 +70,10 @@ export const BannerLayoutEditor = ({
     : layoutOverlay
       ? layoutOverlay.primaryLogo
       : {
-          left: LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX,
-          top: LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY,
-          width: LAYOUT_PRIMARY_LOGO_BOX,
-          height: LAYOUT_PRIMARY_LOGO_BOX
+          left: L.LAYOUT_MARGIN + values.layoutPrimaryLogoDeltaX,
+          top: L.LAYOUT_LOGO_TOP + values.layoutPrimaryLogoDeltaY,
+          width: L.LAYOUT_PRIMARY_LOGO_BOX,
+          height: L.LAYOUT_PRIMARY_LOGO_BOX
         };
 
   const secondaryRect: LayoutElementRect | null = !hasSecondaryLogo
@@ -93,26 +81,26 @@ export const BannerLayoutEditor = ({
     : layoutOverlay
       ? layoutOverlay.secondaryLogo
       : {
-          left: LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX,
-          top: LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY,
-          width: LAYOUT_SECONDARY_LOGO_BOX,
-          height: LAYOUT_SECONDARY_LOGO_BOX
+          left: L.LAYOUT_SECONDARY_LOGO_LEFT + values.layoutSecondaryLogoDeltaX,
+          top: L.LAYOUT_SECONDARY_LOGO_TOP + values.layoutSecondaryLogoDeltaY,
+          width: L.LAYOUT_SECONDARY_LOGO_BOX,
+          height: L.LAYOUT_SECONDARY_LOGO_BOX
         };
 
   const textRect: LayoutElementRect = layoutOverlay?.textBlock ?? {
-    left: LAYOUT_TEXT_BLOCK_LEFT + values.layoutTextBlockDeltaX,
-    top: LAYOUT_TEXT_BLOCK_TOP + values.layoutTextBlockDeltaY,
-    width: LAYOUT_TEXT_BLOCK_WIDTH,
-    height: LAYOUT_TEXT_BLOCK_HEIGHT
+    left: L.LAYOUT_TEXT_BLOCK_LEFT + values.layoutTextBlockDeltaX,
+    top: L.LAYOUT_TEXT_BLOCK_TOP + values.layoutTextBlockDeltaY,
+    width: L.LAYOUT_TEXT_BLOCK_WIDTH,
+    height: L.LAYOUT_TEXT_BLOCK_HEIGHT
   };
 
   const phoneRect: LayoutElementRect | null = layoutOverlay
     ? layoutOverlay.phoneGroup
     : {
-        left: LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX,
-        top: LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY,
-        width: LAYOUT_PHONE_REGION_W,
-        height: LAYOUT_PHONE_REGION_H
+        left: L.LAYOUT_PHONE_REGION_LEFT + values.layoutPhoneGroupDeltaX,
+        top: L.LAYOUT_PHONE_REGION_TOP + values.layoutPhoneGroupDeltaY,
+        width: L.LAYOUT_PHONE_REGION_W,
+        height: L.LAYOUT_PHONE_REGION_H
       };
 
   const commitPrimaryStop = useCallback(

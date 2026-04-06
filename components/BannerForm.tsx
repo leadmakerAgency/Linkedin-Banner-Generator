@@ -1,6 +1,15 @@
 "use client";
 
-import { BannerFormValues, BannerType, CompanyPageType, FontWeightId, StylePresetId, FontStyleId } from "@/types/banner";
+import {
+  BannerFormValues,
+  BannerType,
+  CompanyPageType,
+  FontWeightId,
+  StylePresetId,
+  FontStyleId,
+  FONT_SIZE_LIMITS,
+  getBannerDimensions
+} from "@/types/banner";
 
 export interface BannerFiles {
   primaryLogo: File | null;
@@ -97,6 +106,9 @@ export const BannerForm = ({
     });
   };
 
+  const exportDims = getBannerDimensions(values.bannerType);
+  const fontLimits = FONT_SIZE_LIMITS[values.bannerType];
+
   return (
     <section
       className={embedded ? "p-0" : "rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)]"}
@@ -104,7 +116,9 @@ export const BannerForm = ({
     >
       <div className="mb-6">
         <h2 className="text-lg font-semibold tracking-tight text-slate-100">Generator Settings</h2>
-        <p className="mt-1 text-sm text-slate-400">Configure brand, typography, and layout controls for 1584x396 output.</p>
+        <p className="mt-1 text-sm text-slate-400">
+          Configure brand, typography, and layout controls for {exportDims.width}×{exportDims.height}px export.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -113,7 +127,7 @@ export const BannerForm = ({
           <select
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
             value={values.bannerType}
-            onChange={(event) => handleInputChange("bannerType", event.target.value)}
+            onChange={(event) => handleInputChange("bannerType", event.target.value as BannerType)}
           >
             {bannerTypes.map((bannerType) => (
               <option key={bannerType.value} value={bannerType.value}>
@@ -168,8 +182,8 @@ export const BannerForm = ({
           Company Name Font Size
           <input
             type="number"
-            min={42}
-            max={108}
+            min={fontLimits.name.min}
+            max={fontLimits.name.max}
             step={1}
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
             value={values.companyNameFontSize}
@@ -258,8 +272,8 @@ export const BannerForm = ({
           Description Font Size
           <input
             type="number"
-            min={16}
-            max={40}
+            min={fontLimits.desc.min}
+            max={fontLimits.desc.max}
             step={1}
             className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
             value={values.companyDescriptionFontSize}
@@ -362,7 +376,7 @@ export const BannerForm = ({
             aria-describedby="phone-offset-x-hint"
           />
           <span id="phone-offset-x-hint" className="text-xs font-normal text-slate-500">
-            Nudges only the handset icon; positive = right, negative = left. Phone number stays put.
+            Nudges only the handset icon; positive = right, negative = left. The number stays fixed; horizontal nudge is capped so the icon does not tuck under the digits.
           </span>
         </label>
 

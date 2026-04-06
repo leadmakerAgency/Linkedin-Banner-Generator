@@ -1,5 +1,5 @@
 import { STYLE_PRESETS } from "@/lib/stylePresets";
-import { BannerGenerationInput } from "@/types/banner";
+import { BannerGenerationInput, getBannerDimensions } from "@/types/banner";
 
 interface PromptBuilderInput {
   values: BannerGenerationInput;
@@ -30,6 +30,12 @@ const hashFromNonce = (nonce?: string): number => {
 };
 
 export const buildStructuredPrompt = ({ values, promptDelta, reduceClutter }: PromptBuilderInput): string => {
+  const dims = getBannerDimensions(values.bannerType);
+  const ratioLabel = (dims.width / dims.height).toFixed(2);
+  const layoutRule =
+    values.bannerType === "personal"
+      ? "Layout rules: keep the left 30 percent of the banner visually clean for LinkedIn profile-picture overlap."
+      : "Layout rules: keep the left edge relatively open for LinkedIn company page branding; favor a wide horizontal focal area for overlays.";
   const style = STYLE_PRESETS[values.stylePreset];
   const clutterGuidance = reduceClutter
     ? "very sparse details, high whitespace, no busy textures"
@@ -54,9 +60,9 @@ export const buildStructuredPrompt = ({ values, promptDelta, reduceClutter }: Pr
     `Clutter level: ${clutterGuidance}.`,
     "Do not render any text, letters, words, numbers, buttons, logos, icons, monograms, badges, or symbols.",
     "The app overlays company name, description, phone, and uploaded logo after generation.",
-    "Layout rules: keep the left 30 percent of the banner visually clean for LinkedIn profile-picture overlap.",
+    layoutRule,
     "Composition: horizontal, premium B2B SaaS feeling with clean negative space for overlays.",
-    "Final aspect ratio must be exactly 4:1 and suitable for 1584x396 export.",
+    `Final export dimensions must be exactly ${dims.width}x${dims.height}px (aspect ratio about ${ratioLabel}:1).`,
     regenerationInstruction,
     promptDelta ?? ""
   ]

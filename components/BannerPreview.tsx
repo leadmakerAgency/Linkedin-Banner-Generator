@@ -1,7 +1,7 @@
 "use client";
 import { BannerLayoutEditor } from "@/components/BannerLayoutEditor";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
-import type { BannerFormValues, LayoutOverlayPayload, RevisionAction } from "@/types/banner";
+import { getBannerDimensions, type BannerFormValues, type LayoutOverlayPayload, type RevisionAction } from "@/types/banner";
 
 interface BannerPreviewProps {
   /** Merged preview when overlay has rendered; may be background-only until first overlay completes. */
@@ -50,12 +50,16 @@ export const BannerPreview = ({
   hasPrimaryLogo,
   hasSecondaryLogo
 }: BannerPreviewProps) => {
+  const { width: exportW, height: exportH } = getBannerDimensions(layoutValues.bannerType);
+
   return (
     <section className="rounded-2xl border border-slate-800/90 bg-slate-900/75 p-6 shadow-[0_20px_45px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl" aria-live="polite">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-100">Preview</h2>
-          <p className="text-sm text-slate-400">Output resolution is fixed at 1584x396 px.</p>
+          <p className="text-sm text-slate-400">
+            Output resolution matches banner type: {exportW}×{exportH}px.
+          </p>
           <p className="mt-1 text-xs text-slate-500">
             {hasBackground
               ? "Background is fixed until you regenerate. Drag dashed regions to move logos, text, or phone; server saves layout in the exported PNG."
@@ -82,7 +86,10 @@ export const BannerPreview = ({
         </div>
       </div>
 
-      <div className="relative mb-5 aspect-[1584/396] overflow-hidden rounded-xl border border-slate-700 bg-slate-950/80 shadow-inner">
+      <div
+        className="relative mb-5 overflow-hidden rounded-xl border border-slate-700 bg-slate-950/80 shadow-inner"
+        style={{ aspectRatio: `${exportW} / ${exportH}` }}
+      >
         {displayUrl ? (
           <>
             <img
@@ -148,7 +155,7 @@ export const BannerPreview = ({
       {downloadUrl ? (
         <a
           href={downloadUrl}
-          download="linkedin-banner.png"
+          download={`linkedin-banner-${layoutValues.bannerType}.png`}
           className="inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
         >
           Download PNG

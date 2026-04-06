@@ -1,7 +1,25 @@
-export const BANNER_WIDTH = 1584;
-export const BANNER_HEIGHT = 396;
+/** Personal profile cover (LinkedIn). */
+export const PERSONAL_BANNER_WIDTH = 1584;
+export const PERSONAL_BANNER_HEIGHT = 396;
+
+/** Company page cover (LinkedIn). */
+export const CORPORATE_BANNER_WIDTH = 1128;
+export const CORPORATE_BANNER_HEIGHT = 191;
+
+/** @deprecated Prefer getBannerDimensions — these are the personal profile dimensions. */
+export const BANNER_WIDTH = PERSONAL_BANNER_WIDTH;
+/** @deprecated Prefer getBannerDimensions — these are the personal profile dimensions. */
+export const BANNER_HEIGHT = PERSONAL_BANNER_HEIGHT;
 
 export type BannerType = "personal" | "corporate";
+
+export type BannerDimensions = { width: number; height: number };
+
+export const getBannerDimensions = (bannerType: BannerType): BannerDimensions =>
+  bannerType === "personal"
+    ? { width: PERSONAL_BANNER_WIDTH, height: PERSONAL_BANNER_HEIGHT }
+    : { width: CORPORATE_BANNER_WIDTH, height: CORPORATE_BANNER_HEIGHT };
+
 export type CompanyPageType = "company" | "agency" | "personal-brand";
 export type StylePresetId =
   | "corporate"
@@ -67,7 +85,7 @@ export interface BannerFormValues {
   primaryBrandColor: string;
   secondaryBrandColor: string;
   phoneNumber: string;
-  /** Pixels to nudge only the phone handset icon (number stays fixed); positive X = right, positive Y = down. */
+  /** Pixels to nudge only the phone handset icon (number stays fixed); positive X = right, positive Y = down. Export clamps X so the icon stays left of the number with a gap. */
   phoneIconOffsetX: number;
   phoneIconOffsetY: number;
   /** Draggable layout: added to default primary logo top-left (banner px). */
@@ -86,6 +104,24 @@ export interface BannerFormValues {
   imageModel: ImageModelId;
 }
 
+/** Default font sizes when switching or resetting banner type. */
+export const DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE: Record<
+  BannerType,
+  Pick<BannerFormValues, "companyNameFontSize" | "companyDescriptionFontSize">
+> = {
+  personal: { companyNameFontSize: 74, companyDescriptionFontSize: 24 },
+  corporate: { companyNameFontSize: 36, companyDescriptionFontSize: 12 }
+};
+
+/** Validation and form input bounds per export format. */
+export const FONT_SIZE_LIMITS: Record<
+  BannerType,
+  { name: { min: number; max: number }; desc: { min: number; max: number } }
+> = {
+  personal: { name: { min: 42, max: 108 }, desc: { min: 16, max: 40 } },
+  corporate: { name: { min: 22, max: 56 }, desc: { min: 10, max: 22 } }
+};
+
 export interface BannerGenerationInput extends BannerFormValues {
   revisionAction?: RevisionAction;
   regenerateNonce?: string;
@@ -96,7 +132,7 @@ export interface GenerateResponse {
   filename: string;
 }
 
-/** Pixel bounds in 1584×396 space for draggable handles (matches last server composite). */
+/** Pixel bounds in export space for draggable handles (matches last server composite). */
 export type LayoutElementRect = {
   left: number;
   top: number;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { z } from "zod";
+import { FONT_SIZE_LIMITS } from "@/types/banner";
 
 export const runtime = "nodejs";
 
@@ -47,29 +48,45 @@ const fontStyleSchema = z.enum([
   "libreBaskerville"
 ]);
 
-const settingsSchema = z.object({
-  bannerType: z.enum(["personal", "corporate"]),
-  companyName: z.string(),
-  companyDescription: z.string(),
-  companyNameFontStyle: fontStyleSchema,
-  companyDescriptionFontStyle: fontStyleSchema,
-  companyNameFontSize: z.number().int().min(42).max(108),
-  companyDescriptionFontSize: z.number().int().min(16).max(40),
-  companyNameFontWeight: fontWeightSchema,
-  companyDescriptionFontWeight: fontWeightSchema,
-  companyNameColorMode: z.enum(["auto", "manual"]),
-  companyNameTextColor: z.string(),
-  companyDescriptionColorMode: z.enum(["auto", "manual"]),
-  companyDescriptionTextColor: z.string(),
-  companyPageType: z.enum(["company", "agency", "personal-brand"]),
-  primaryBrandColor: z.string(),
-  secondaryBrandColor: z.string(),
-  phoneNumber: z.string(),
-  phoneIconOffsetX: z.number().int().min(-400).max(400),
-  phoneIconOffsetY: z.number().int().min(-200).max(200),
-  imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
-  stylePreset: stylePresetSchema
-});
+const settingsSchema = z
+  .object({
+    bannerType: z.enum(["personal", "corporate"]),
+    companyName: z.string(),
+    companyDescription: z.string(),
+    companyNameFontStyle: fontStyleSchema,
+    companyDescriptionFontStyle: fontStyleSchema,
+    companyNameFontSize: z.number().int(),
+    companyDescriptionFontSize: z.number().int(),
+    companyNameFontWeight: fontWeightSchema,
+    companyDescriptionFontWeight: fontWeightSchema,
+    companyNameColorMode: z.enum(["auto", "manual"]),
+    companyNameTextColor: z.string(),
+    companyDescriptionColorMode: z.enum(["auto", "manual"]),
+    companyDescriptionTextColor: z.string(),
+    companyPageType: z.enum(["company", "agency", "personal-brand"]),
+    primaryBrandColor: z.string(),
+    secondaryBrandColor: z.string(),
+    phoneNumber: z.string(),
+    phoneIconOffsetX: z.number().int().min(-400).max(400),
+    phoneIconOffsetY: z.number().int().min(-200).max(200),
+    imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
+    stylePreset: stylePresetSchema
+  })
+  .superRefine((data, ctx) => {
+    const lim = FONT_SIZE_LIMITS[data.bannerType];
+    if (data.companyNameFontSize < lim.name.min || data.companyNameFontSize > lim.name.max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `companyNameFontSize must be between ${lim.name.min} and ${lim.name.max} for ${data.bannerType} banners`
+      });
+    }
+    if (data.companyDescriptionFontSize < lim.desc.min || data.companyDescriptionFontSize > lim.desc.max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `companyDescriptionFontSize must be between ${lim.desc.min} and ${lim.desc.max} for ${data.bannerType} banners`
+      });
+    }
+  });
 
 const requestSchema = z.object({
   messages: z.array(messageSchema).min(1).max(30),
@@ -82,8 +99,8 @@ const patchSchema = z.object({
   companyDescription: z.string().max(80).optional(),
   companyNameFontStyle: fontStyleSchema.optional(),
   companyDescriptionFontStyle: fontStyleSchema.optional(),
-  companyNameFontSize: z.number().int().min(42).max(108).optional(),
-  companyDescriptionFontSize: z.number().int().min(16).max(40).optional(),
+  companyNameFontSize: z.number().int().min(10).max(108).optional(),
+  companyDescriptionFontSize: z.number().int().min(8).max(40).optional(),
   companyNameFontWeight: fontWeightSchema.optional(),
   companyDescriptionFontWeight: fontWeightSchema.optional(),
   companyNameColorMode: z.enum(["auto", "manual"]).optional(),

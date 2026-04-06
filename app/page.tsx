@@ -7,7 +7,13 @@ import { ChatAssistant } from "@/components/ChatAssistant";
 import { BannerPreview } from "@/components/BannerPreview";
 import { nudgeLayoutOverlay, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { LayoutOverlayPayload } from "@/types/banner";
-import { BannerFormValues, RevisionAction } from "@/types/banner";
+import {
+  BannerFormValues,
+  BannerType,
+  DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE,
+  RevisionAction,
+  getBannerDimensions
+} from "@/types/banner";
 
 const INITIAL_VALUES: BannerFormValues = {
   bannerType: "personal",
@@ -94,6 +100,7 @@ const HomePage = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [layoutOverlay, setLayoutOverlay] = useState<LayoutOverlayPayload | null>(null);
   const overlayRequestId = useRef(0);
+  const previousBannerType = useRef<BannerType | null>(null);
 
   const generateNonce = (): string => {
     if (typeof window !== "undefined" && window.crypto && "randomUUID" in window.crypto) {
@@ -102,6 +109,7 @@ const HomePage = () => {
     return `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   };
 
+  const chatExportDims = getBannerDimensions(values.bannerType);
   const autoChatPrompt = [
     `Create a ${values.bannerType} LinkedIn banner.`,
     `Company name: ${values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName}.`,
@@ -125,10 +133,10 @@ const HomePage = () => {
     `Primary brand color: ${values.primaryBrandColor}.`,
     `Secondary brand color: ${values.secondaryBrandColor}.`,
     `Phone number: ${values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber}.`,
-    `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
+    `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right, clamped so the icon stays left of the digits), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
     `Style preset: ${values.stylePreset}.`,
     `Image model: ${values.imageModel}.`,
-    "Make it professional, clean, and suitable for 1584x396 LinkedIn cover dimensions."
+    `Make it professional, clean, and suitable for ${chatExportDims.width}×${chatExportDims.height}px LinkedIn cover dimensions.`
   ].join(" ");
 
   const handleBuildFormData = useCallback(
@@ -268,6 +276,33 @@ const HomePage = () => {
   const handleLayoutDragNudge = useCallback((group: LayoutDragGroup, dx: number, dy: number) => {
     setLayoutOverlay((previous) => nudgeLayoutOverlay(previous, group, dx, dy));
   }, []);
+
+  useEffect(() => {
+    if (previousBannerType.current === null) {
+      previousBannerType.current = values.bannerType;
+      return;
+    }
+    if (previousBannerType.current === values.bannerType) {
+      return;
+    }
+    previousBannerType.current = values.bannerType;
+    setBackgroundUrl(null);
+    setPreviewUrl(null);
+    setLayoutOverlay(null);
+    setErrorMessage(null);
+    setValues((previous) => ({
+      ...previous,
+      ...DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE[values.bannerType],
+      layoutPrimaryLogoDeltaX: 0,
+      layoutPrimaryLogoDeltaY: 0,
+      layoutSecondaryLogoDeltaX: 0,
+      layoutSecondaryLogoDeltaY: 0,
+      layoutTextBlockDeltaX: 0,
+      layoutTextBlockDeltaY: 0,
+      layoutPhoneGroupDeltaX: 0,
+      layoutPhoneGroupDeltaY: 0
+    }));
+  }, [values.bannerType]);
 
   useEffect(() => {
     if (!backgroundUrl) {
