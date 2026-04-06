@@ -33,16 +33,25 @@ export type PhoneRowLayoutResult = {
   textRect: LayoutElementRect | null;
 };
 
-/** Shift a 1D interval [min, max] into [lo, hi] without changing its width; prefers fixing left overflow then right. */
+/**
+ * Shift a 1D interval [min, max] into [lo, hi] without changing its width.
+ * Returns 0 when the interval is already inside [lo, hi]; fixes overflow otherwise.
+ */
 const fitInterval1D = (min: number, max: number, lo: number, hi: number): number => {
   if (max - min > hi - lo) {
+    // Interval wider than allowed range — pin to lo edge.
     return lo - min;
   }
-  let shift = lo - min;
-  if (max + shift > hi) {
-    shift = hi - max;
+  if (min >= lo && max <= hi) {
+    // Already fully inside — no shift needed.
+    return 0;
   }
-  return shift;
+  if (min < lo) {
+    // Overflows on the left — shift right.
+    return lo - min;
+  }
+  // Overflows on the right — shift left.
+  return hi - max;
 };
 
 /**
