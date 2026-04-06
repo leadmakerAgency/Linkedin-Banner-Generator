@@ -96,30 +96,8 @@ type DraftSnapshot = {
   updatedAt: string;
 };
 
-const loadDraftValues = (): BannerFormValues => {
-  if (typeof window === "undefined") {
-    return INITIAL_VALUES;
-  }
-  try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (!raw) {
-      return INITIAL_VALUES;
-    }
-    const parsed = JSON.parse(raw) as Partial<DraftSnapshot>;
-    if (!parsed.values) {
-      return INITIAL_VALUES;
-    }
-    return {
-      ...INITIAL_VALUES,
-      ...parsed.values
-    };
-  } catch {
-    return INITIAL_VALUES;
-  }
-};
-
 const HomePage = () => {
-  const [values, setValues] = useState<BannerFormValues>(loadDraftValues);
+  const [values, setValues] = useState<BannerFormValues>(INITIAL_VALUES);
   const [files, setFiles] = useState<BannerFiles>(INITIAL_FILES);
   const [promptSnapshot, setPromptSnapshot] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
@@ -309,6 +287,29 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<DraftSnapshot>;
+      if (!parsed.values) {
+        return;
+      }
+      const merged = {
+        ...INITIAL_VALUES,
+        ...parsed.values
+      };
+      setValues(merged);
+    } catch {
+      // ignore malformed draft
+    }
+  }, []);
+
+  useEffect(() => {
     setPromptSnapshot(generatedPrompt);
     const snapshot: DraftSnapshot = {
       values,
@@ -382,7 +383,6 @@ const HomePage = () => {
             setErrorMessage(data.error ?? "Failed to apply text and logos.");
             return;
           }
-
           setPreviewUrl(data.imageUrl);
           setLayoutOverlay(data.layoutOverlay ?? null);
         } catch {
