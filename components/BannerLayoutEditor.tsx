@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Draggable, { type DraggableData, type DraggableEvent } from "react-draggable";
 import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
@@ -8,6 +8,22 @@ import type { BannerFormValues, LayoutElementRect, LayoutOverlayPayload } from "
 import { getBannerDimensions } from "@/types/banner";
 
 const clampDelta = (value: number): number => Math.max(-400, Math.min(400, value));
+
+/** Preview CSS px → banner px: read container width at pointer-up so commits never use a stale scale. */
+const getCommitScale = (
+  container: HTMLDivElement | null,
+  bannerPixelWidth: number,
+  fallback: number
+): number => {
+  if (!container) {
+    return fallback > 0 ? fallback : 1;
+  }
+  const w = container.getBoundingClientRect().width;
+  if (w <= 0) {
+    return fallback > 0 ? fallback : 1;
+  }
+  return w / bannerPixelWidth;
+};
 
 const handleClass =
   "pointer-events-auto absolute z-10 box-border cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
@@ -18,6 +34,8 @@ const rectToStyle = (rect: LayoutElementRect, scale: number) => ({
   width: rect.width * scale,
   height: rect.height * scale
 });
+
+type DragPos = { x: number; y: number };
 
 interface BannerLayoutEditorProps {
   values: BannerFormValues;
@@ -42,11 +60,15 @@ export const BannerLayoutEditor = ({
   const textRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [primaryDrag, setPrimaryDrag] = useState<DragPos>({ x: 0, y: 0 });
+  const [secondaryDrag, setSecondaryDrag] = useState<DragPos>({ x: 0, y: 0 });
+  const [textDrag, setTextDrag] = useState<DragPos>({ x: 0, y: 0 });
+  const [phoneDrag, setPhoneDrag] = useState<DragPos>({ x: 0, y: 0 });
 
   const bannerPixelWidth = getBannerDimensions(values.bannerType).width;
   const L = getBannerLayoutConstants(values.bannerType);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) {
       return;
@@ -103,67 +125,104 @@ export const BannerLayoutEditor = ({
         height: L.LAYOUT_PHONE_REGION_H
       };
 
-  const commitPrimaryStop = useCallback(
+  const handlePrimaryStop = useCallback(
     (_e: DraggableEvent, data: DraggableData) => {
-      const dx = Math.round(data.x / s);
-      const dy = Math.round(data.y / s);
+      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
+      const dx = Math.round(data.x / commitScale);
+      const dy = Math.round(data.y / commitScale);
       onLayoutDeltaChange({
         layoutPrimaryLogoDeltaX: clampDelta(values.layoutPrimaryLogoDeltaX + dx),
         layoutPrimaryLogoDeltaY: clampDelta(values.layoutPrimaryLogoDeltaY + dy)
       });
       onLayoutDragNudge("primary", dx, dy);
+      setPrimaryDrag({ x: 0, y: 0 });
     },
-    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutPrimaryLogoDeltaX, values.layoutPrimaryLogoDeltaY]
+    [
+      bannerPixelWidth,
+      onLayoutDeltaChange,
+      onLayoutDragNudge,
+      s,
+      values.layoutPrimaryLogoDeltaX,
+      values.layoutPrimaryLogoDeltaY
+    ]
   );
 
-  const commitSecondaryStop = useCallback(
+  const handleSecondaryStop = useCallback(
     (_e: DraggableEvent, data: DraggableData) => {
-      const dx = Math.round(data.x / s);
-      const dy = Math.round(data.y / s);
+      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
+      const dx = Math.round(data.x / commitScale);
+      const dy = Math.round(data.y / commitScale);
       onLayoutDeltaChange({
         layoutSecondaryLogoDeltaX: clampDelta(values.layoutSecondaryLogoDeltaX + dx),
         layoutSecondaryLogoDeltaY: clampDelta(values.layoutSecondaryLogoDeltaY + dy)
       });
       onLayoutDragNudge("secondary", dx, dy);
+      setSecondaryDrag({ x: 0, y: 0 });
     },
-    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutSecondaryLogoDeltaX, values.layoutSecondaryLogoDeltaY]
+    [
+      bannerPixelWidth,
+      onLayoutDeltaChange,
+      onLayoutDragNudge,
+      s,
+      values.layoutSecondaryLogoDeltaX,
+      values.layoutSecondaryLogoDeltaY
+    ]
   );
 
-  const commitTextStop = useCallback(
+  const handleTextStop = useCallback(
     (_e: DraggableEvent, data: DraggableData) => {
-      const dx = Math.round(data.x / s);
-      const dy = Math.round(data.y / s);
+      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
+      const dx = Math.round(data.x / commitScale);
+      const dy = Math.round(data.y / commitScale);
       onLayoutDeltaChange({
         layoutTextBlockDeltaX: clampDelta(values.layoutTextBlockDeltaX + dx),
         layoutTextBlockDeltaY: clampDelta(values.layoutTextBlockDeltaY + dy)
       });
       onLayoutDragNudge("text", dx, dy);
+      setTextDrag({ x: 0, y: 0 });
     },
-    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutTextBlockDeltaX, values.layoutTextBlockDeltaY]
+    [
+      bannerPixelWidth,
+      onLayoutDeltaChange,
+      onLayoutDragNudge,
+      s,
+      values.layoutTextBlockDeltaX,
+      values.layoutTextBlockDeltaY
+    ]
   );
 
-  const commitPhoneStop = useCallback(
+  const handlePhoneStop = useCallback(
     (_e: DraggableEvent, data: DraggableData) => {
-      const dx = Math.round(data.x / s);
-      const dy = Math.round(data.y / s);
+      const commitScale = getCommitScale(containerRef.current, bannerPixelWidth, s);
+      const dx = Math.round(data.x / commitScale);
+      const dy = Math.round(data.y / commitScale);
       onLayoutDeltaChange({
         layoutPhoneGroupDeltaX: clampDelta(values.layoutPhoneGroupDeltaX + dx),
         layoutPhoneGroupDeltaY: clampDelta(values.layoutPhoneGroupDeltaY + dy)
       });
       onLayoutDragNudge("phone", dx, dy);
+      setPhoneDrag({ x: 0, y: 0 });
     },
-    [onLayoutDeltaChange, onLayoutDragNudge, s, values.layoutPhoneGroupDeltaX, values.layoutPhoneGroupDeltaY]
+    [
+      bannerPixelWidth,
+      onLayoutDeltaChange,
+      onLayoutDragNudge,
+      s,
+      values.layoutPhoneGroupDeltaX,
+      values.layoutPhoneGroupDeltaY
+    ]
   );
 
   return (
     <div ref={containerRef} className="pointer-events-none absolute inset-0">
       {primaryRect ? (
         <Draggable
-          key={`p-${values.layoutPrimaryLogoDeltaX}-${values.layoutPrimaryLogoDeltaY}`}
           nodeRef={primaryRef}
           bounds="parent"
-          defaultPosition={{ x: 0, y: 0 }}
-          onStop={commitPrimaryStop}
+          position={primaryDrag}
+          scale={1}
+          onDrag={(_e, data) => setPrimaryDrag({ x: data.x, y: data.y })}
+          onStop={handlePrimaryStop}
         >
           <div
             ref={primaryRef}
@@ -178,11 +237,12 @@ export const BannerLayoutEditor = ({
 
       {secondaryRect ? (
         <Draggable
-          key={`s-${values.layoutSecondaryLogoDeltaX}-${values.layoutSecondaryLogoDeltaY}`}
           nodeRef={secondaryRef}
           bounds="parent"
-          defaultPosition={{ x: 0, y: 0 }}
-          onStop={commitSecondaryStop}
+          position={secondaryDrag}
+          scale={1}
+          onDrag={(_e, data) => setSecondaryDrag({ x: data.x, y: data.y })}
+          onStop={handleSecondaryStop}
         >
           <div
             ref={secondaryRef}
@@ -196,11 +256,12 @@ export const BannerLayoutEditor = ({
       ) : null}
 
       <Draggable
-        key={`t-${values.layoutTextBlockDeltaX}-${values.layoutTextBlockDeltaY}`}
         nodeRef={textRef}
         bounds="parent"
-        defaultPosition={{ x: 0, y: 0 }}
-        onStop={commitTextStop}
+        position={textDrag}
+        scale={1}
+        onDrag={(_e, data) => setTextDrag({ x: data.x, y: data.y })}
+        onStop={handleTextStop}
       >
         <div
           ref={textRef}
@@ -214,11 +275,12 @@ export const BannerLayoutEditor = ({
 
       {phoneRect ? (
         <Draggable
-          key={`ph-${values.layoutPhoneGroupDeltaX}-${values.layoutPhoneGroupDeltaY}`}
           nodeRef={phoneRef}
           bounds="parent"
-          defaultPosition={{ x: 0, y: 0 }}
-          onStop={commitPhoneStop}
+          position={phoneDrag}
+          scale={1}
+          onDrag={(_e, data) => setPhoneDrag({ x: data.x, y: data.y })}
+          onStop={handlePhoneStop}
         >
           <div
             ref={phoneRef}
