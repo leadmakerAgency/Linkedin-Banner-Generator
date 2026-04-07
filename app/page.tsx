@@ -400,7 +400,7 @@ const HomePage = () => {
       <div className="mx-auto mb-6 w-full max-w-[1460px] rounded-3xl border border-slate-800/90 bg-slate-900/75 p-5 shadow-[0_22px_60px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl md:p-7">
         <div className="flex items-center gap-4">
           <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-2 shadow-inner shadow-blue-500/10">
-            <Image src="/app-logo.svg" alt="App logo" width={44} height={44} priority />
+            <Image src="/leadmaker-logo.png" alt="LeadMaker" width={44} height={44} priority />
           </div>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">LinkedIn Banner Generator</h1>

@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   title: "LinkedIn Banner Generator",
   description: "Form-based LinkedIn banner generator with deterministic safe zones.",
   icons: {
-    icon: "/app-logo.svg",
-    shortcut: "/app-logo.svg",
-    apple: "/app-logo.svg"
+    icon: "/leadmaker-logo.png",
+    shortcut: "/leadmaker-logo.png",
+    apple: "/leadmaker-logo.png"
   }
 };
 
