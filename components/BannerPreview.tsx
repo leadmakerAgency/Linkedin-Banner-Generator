@@ -187,19 +187,21 @@ export const BannerPreview = ({
           {backgroundDownloadUrl ? (
             <a
               href={backgroundDownloadUrl}
-              download={`linkedin-banner-bg-${layoutValues.bannerType}.png`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
             >
-              Download Background PNG
+              Download only background
             </a>
           ) : null}
           {downloadUrl ? (
             <a
               href={downloadUrl}
-              download={`linkedin-banner-${layoutValues.bannerType}.png`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
             >
-              Download PNG
+              Download banner
             </a>
           ) : null}
         </div>
