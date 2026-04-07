@@ -95,6 +95,10 @@ const HomePage = () => {
   const [promptSnapshot, setPromptSnapshot] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [importUrl, setImportUrl] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImportingBackground, setIsImportingBackground] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [isLoadingBackground, setIsLoadingBackground] = useState(false);
   const [isLoadingOverlay, setIsLoadingOverlay] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -102,6 +106,7 @@ const HomePage = () => {
   const [layoutOverlay, setLayoutOverlay] = useState<LayoutOverlayPayload | null>(null);
   const overlayRequestId = useRef(0);
   const previousBannerType = useRef<BannerType | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const generateNonce = (): string => {
     if (typeof window !== "undefined" && window.crypto && "randomUUID" in window.crypto) {
@@ -252,6 +257,81 @@ const HomePage = () => {
     setValues(resetValues);
     setLayoutOverlay(null);
     void handleBackgroundRequest("/api/generate-background", true, resetValues);
+  };
+
+  const handleApplyImportedBackground = useCallback((nextBackgroundUrl: string) => {
+    setValues((previous) => withDefaultLayout(previous));
+    setLayoutOverlay(null);
+    setPreviewUrl(null);
+    setBackgroundUrl(stripQuery(nextBackgroundUrl));
+    setIsLoadingOverlay(true);
+    setErrorMessage(null);
+    setImportError(null);
+  }, []);
+
+  const handleImportBackgroundFile = async () => {
+    if (!importFile) {
+      setImportError("Choose an image file before importing.");
+      return;
+    }
+
+    setIsImportingBackground(true);
+    setImportError(null);
+    try {
+      const formData = new FormData();
+      formData.set("file", importFile);
+      formData.set("bannerType", values.bannerType);
+      formData.set("secondaryBrandColor", values.secondaryBrandColor);
+      const response = await fetch("/api/import-background", {
+        method: "POST",
+        body: formData
+      });
+      const data = (await response.json()) as { backgroundUrl?: string; error?: string };
+      if (!response.ok || !data.backgroundUrl) {
+        setImportError(data.error ?? "Failed to import background file.");
+        return;
+      }
+      handleApplyImportedBackground(data.backgroundUrl);
+      setImportFile(null);
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = "";
+      }
+    } catch {
+      setImportError("Unable to import file. Please try again.");
+    } finally {
+      setIsImportingBackground(false);
+    }
+  };
+
+  const handleImportBackgroundUrl = async () => {
+    const trimmedUrl = importUrl.trim();
+    if (!trimmedUrl) {
+      setImportError("Paste a valid image URL before importing.");
+      return;
+    }
+
+    setIsImportingBackground(true);
+    setImportError(null);
+    try {
+      const formData = new FormData();
+      formData.set("imageUrl", trimmedUrl);
+      formData.set("bannerType", values.bannerType);
+      formData.set("secondaryBrandColor", values.secondaryBrandColor);
+      const response = await fetch("/api/import-background", {
+        method: "POST",
+        body: formData
+      });
+      const data = (await response.json()) as { backgroundUrl?: string; error?: string };
+      if (!response.ok || !data.backgroundUrl) {
+        setImportError(data.error ?? "Failed to import background URL.");
+        return;
+      }
+      handleApplyImportedBackground(data.backgroundUrl);
+    } catch {
+      setImportError("Unable to import URL image. Please try again.");
+    } finally {
+      setIsImportingBackground(false);
+    }
   };
 
   const handlePatchValues = (patch: Partial<BannerFormValues>) => {
@@ -443,6 +523,62 @@ const HomePage = () => {
                 className="h-36 w-full resize-none rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-xs text-slate-300 outline-none"
                 aria-label="Generated prompt snapshot"
               />
+
+              <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                <h4 className="text-sm font-semibold tracking-tight text-slate-200">Background source</h4>
+                <p className="mt-1 text-xs text-slate-400">
+                  Import a saved background (without overlays) to continue edits. Import resets logo/text/phone layout positions.
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label htmlFor="background-file-import" className="block text-xs font-medium text-slate-300">
+                      Import from file
+                    </label>
+                    <input
+                      id="background-file-import"
+                      ref={importFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                      className="block w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-100 hover:file:bg-slate-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportBackgroundFile}
+                      disabled={isImportingBackground || !importFile}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isImportingBackground ? "Importing..." : "Import file"}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="background-url-import" className="block text-xs font-medium text-slate-300">
+                      Import from URL
+                    </label>
+                    <input
+                      id="background-url-import"
+                      type="url"
+                      value={importUrl}
+                      onChange={(event) => setImportUrl(event.target.value)}
+                      placeholder="https://example.com/background.png"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-200 outline-none ring-blue-500/40 placeholder:text-slate-500 focus:ring-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleImportBackgroundUrl}
+                      disabled={isImportingBackground || importUrl.trim().length === 0}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isImportingBackground ? "Importing..." : "Import URL"}
+                    </button>
+                  </div>
+                </div>
+                {importError ? (
+                  <p className="mt-3 rounded-xl border border-rose-500/45 bg-rose-950/60 px-3 py-2 text-xs font-medium text-rose-200" aria-live="polite">
+                    {importError}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -455,6 +591,7 @@ const HomePage = () => {
             isLoadingOverlay={isLoadingOverlay}
             loadingProgress={loadingProgress}
             onRegenerateBackground={handleRegenerateBackground}
+            backgroundDownloadUrl={backgroundUrl}
             downloadUrl={previewUrl}
             layoutValues={values}
             onLayoutDeltaChange={handlePatchValues}

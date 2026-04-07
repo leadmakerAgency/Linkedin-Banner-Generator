@@ -12,6 +12,8 @@ interface BannerPreviewProps {
   isLoadingOverlay: boolean;
   loadingProgress: number;
   onRegenerateBackground: () => void;
+  /** Raw generated/imported background PNG URL (without overlays). */
+  backgroundDownloadUrl: string | null;
   /** Final merged PNG for download; disabled until overlay render exists. */
   downloadUrl: string | null;
   layoutValues: BannerFormValues;
@@ -32,6 +34,7 @@ export const BannerPreview = ({
   isLoadingOverlay,
   loadingProgress,
   onRegenerateBackground,
+  backgroundDownloadUrl,
   downloadUrl,
   layoutValues,
   onLayoutDeltaChange,
@@ -179,16 +182,29 @@ export const BannerPreview = ({
         </div>
       ) : null}
 
-      {downloadUrl ? (
-        <a
-          href={downloadUrl}
-          download={`linkedin-banner-${layoutValues.bannerType}.png`}
-          className="inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
-        >
-          Download PNG
-        </a>
+      {backgroundDownloadUrl || downloadUrl ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {backgroundDownloadUrl ? (
+            <a
+              href={backgroundDownloadUrl}
+              download={`linkedin-banner-bg-${layoutValues.bannerType}.png`}
+              className="inline-flex rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+            >
+              Download Background PNG
+            </a>
+          ) : null}
+          {downloadUrl ? (
+            <a
+              href={downloadUrl}
+              download={`linkedin-banner-${layoutValues.bannerType}.png`}
+              className="inline-flex rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+            >
+              Download PNG
+            </a>
+          ) : null}
+        </div>
       ) : hasBackground ? (
-        <p className="text-xs text-slate-500">Applying overlay… download will appear when ready.</p>
+        <p className="text-xs text-slate-500">Applying overlay… final PNG download appears when ready.</p>
       ) : null}
     </section>
   );
