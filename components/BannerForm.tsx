@@ -85,6 +85,29 @@ const fontStyles: Array<{ value: FontStyleId; label: string }> = [
   { value: "libreBaskerville", label: "Libre Baskerville" }
 ];
 
+const FONT_PREVIEW_CLASS: Record<FontStyleId, string> = {
+  inter: "font-preview-inter",
+  poppins: "font-preview-poppins",
+  montserrat: "font-preview-montserrat",
+  lato: "font-preview-lato",
+  roboto: "font-preview-roboto",
+  openSans: "font-preview-openSans",
+  nunito: "font-preview-nunito",
+  raleway: "font-preview-raleway",
+  oswald: "font-preview-oswald",
+  playfairDisplay: "font-preview-playfairDisplay",
+  merriweather: "font-preview-merriweather",
+  ubuntu: "font-preview-ubuntu",
+  workSans: "font-preview-workSans",
+  sourceSansPro: "font-preview-sourceSansPro",
+  manrope: "font-preview-manrope",
+  mulish: "font-preview-mulish",
+  quicksand: "font-preview-quicksand",
+  ptSans: "font-preview-ptSans",
+  dmSans: "font-preview-dmSans",
+  libreBaskerville: "font-preview-libreBaskerville"
+};
+
 export const BannerForm = ({
   values,
   files,
@@ -167,7 +190,7 @@ export const BannerForm = ({
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Company Name Font
           <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            className={`rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 ${FONT_PREVIEW_CLASS[values.companyNameFontStyle]}`}
             value={values.companyNameFontStyle}
             onChange={(event) => handleInputChange("companyNameFontStyle", event.target.value)}
           >
@@ -177,6 +200,9 @@ export const BannerForm = ({
               </option>
             ))}
           </select>
+          <span className={`text-xs font-normal text-slate-400 ${FONT_PREVIEW_CLASS[values.companyNameFontStyle]}`}>
+            {FONT_SAMPLE_TEXT}
+          </span>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
@@ -256,7 +282,7 @@ export const BannerForm = ({
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Description Font
           <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            className={`rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 ${FONT_PREVIEW_CLASS[values.companyDescriptionFontStyle]}`}
             value={values.companyDescriptionFontStyle}
             onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
           >
@@ -266,6 +292,9 @@ export const BannerForm = ({
               </option>
             ))}
           </select>
+          <span className={`text-xs font-normal text-slate-400 ${FONT_PREVIEW_CLASS[values.companyDescriptionFontStyle]}`}>
+            {FONT_SAMPLE_TEXT}
+          </span>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">

@@ -44,7 +44,7 @@ export const getBundledFont = (
   const root = process.cwd();
   const selected = FONT_FILES[style];
   return {
-    fontfile: path.join(root, "assets", "fonts", selected.fontfile),
+    fontfile: path.join(root, "public", "fonts", selected.fontfile),
     fontFamily: selected.fontFamily
   };
 };

@@ -8,6 +8,9 @@ const __dirname = path.dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["192.168.159.1", "localhost", "127.0.0.1"],
+  outputFileTracingIncludes: {
+    "/*": ["./public/fonts/**/*", "./assets/fonts/**/*"]
+  },
   turbopack: {
     root: __dirname
   }
