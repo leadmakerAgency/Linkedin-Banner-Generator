@@ -114,7 +114,11 @@ const generationSchema = z
     "dark-tech",
     "clean-light",
     "gradient-wave"
-  ])
+  ]),
+  stylePromptVariantIndex: z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? 0 : val),
+    z.coerce.number().int().min(0).max(4)
+  )
 })
   .superRefine((data, ctx) => {
     const lim = FONT_SIZE_LIMITS[data.bannerType];
@@ -671,7 +675,8 @@ export const parseBannerInput = (formData: FormData): {
     layoutPhoneGroupDeltaX: parseFormValue(formData.get("layoutPhoneGroupDeltaX")),
     layoutPhoneGroupDeltaY: parseFormValue(formData.get("layoutPhoneGroupDeltaY")),
     imageModel: parseFormValue(formData.get("imageModel")) as BannerGenerationInput["imageModel"],
-    stylePreset: parseFormValue(formData.get("stylePreset")) as StylePresetId
+    stylePreset: parseFormValue(formData.get("stylePreset")) as StylePresetId,
+    stylePromptVariantIndex: parseFormValue(formData.get("stylePromptVariantIndex"))
   });
 
   if (!validation.success) {

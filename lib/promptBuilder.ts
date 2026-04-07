@@ -1,4 +1,5 @@
 import { STYLE_PRESETS } from "@/lib/stylePresets";
+import { getStylePromptSentence } from "@/lib/stylePresetPromptVersions";
 import { BannerGenerationInput, getBannerDimensions } from "@/types/banner";
 
 interface PromptBuilderInput {
@@ -37,6 +38,7 @@ export const buildStructuredPrompt = ({ values, promptDelta, reduceClutter }: Pr
       ? "Layout rules: keep the left 30 percent of the banner visually clean for LinkedIn profile-picture overlap."
       : "Layout rules: keep the left edge relatively open for LinkedIn company page branding; favor a wide horizontal focal area for overlays.";
   const style = STYLE_PRESETS[values.stylePreset];
+  const styleSentence = getStylePromptSentence(values.stylePreset, values.stylePromptVariantIndex);
   const clutterGuidance = reduceClutter
     ? "very sparse details, high whitespace, no busy textures"
     : "balanced decorative abstract details";
@@ -55,7 +57,7 @@ export const buildStructuredPrompt = ({ values, promptDelta, reduceClutter }: Pr
     `Company description text color mode: ${values.companyDescriptionColorMode}.`,
     `Image generation model: ${values.imageModel}.`,
     `Brand direction: primary color ${values.primaryBrandColor}, secondary color ${values.secondaryBrandColor}.`,
-    `Style preset: ${style.promptTone}.`,
+    `Style preset (${style.label}): ${styleSentence}`,
     `Creative concept: ${selectedConcept}.`,
     `Clutter level: ${clutterGuidance}.`,
     "Do not render any text, letters, words, numbers, buttons, logos, icons, monograms, badges, or symbols.",

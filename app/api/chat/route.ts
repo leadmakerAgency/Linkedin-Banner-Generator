@@ -70,7 +70,8 @@ const settingsSchema = z
     phoneIconOffsetX: z.number().int().min(-400).max(400),
     phoneIconOffsetY: z.number().int().min(-200).max(200),
     imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
-    stylePreset: stylePresetSchema
+    stylePreset: stylePresetSchema,
+    stylePromptVariantIndex: z.number().int().min(0).max(4).optional()
   })
   .superRefine((data, ctx) => {
     const lim = FONT_SIZE_LIMITS[data.bannerType];

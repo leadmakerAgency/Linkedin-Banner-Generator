@@ -105,6 +105,8 @@ export interface BannerFormValues {
   layoutPhoneGroupDeltaX: number;
   layoutPhoneGroupDeltaY: number;
   stylePreset: StylePresetId;
+  /** Index 0–4 into STYLE_PRESET_PROMPT_VERSIONS; randomized when style preset changes. */
+  stylePromptVariantIndex: number;
   imageModel: ImageModelId;
 }
 

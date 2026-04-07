@@ -6,6 +6,8 @@ import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { BannerPreview } from "@/components/BannerPreview";
 import { nudgeLayoutOverlay, nudgeLayoutOverlayResize, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { LayoutOverlayPayload } from "@/types/banner";
+import { STYLE_PRESETS } from "@/lib/stylePresets";
+import { getStylePromptSentence } from "@/lib/stylePresetPromptVersions";
 import {
   BannerFormValues,
   BannerType,
@@ -44,6 +46,7 @@ const INITIAL_VALUES: BannerFormValues = {
   layoutPhoneGroupDeltaX: 0,
   layoutPhoneGroupDeltaY: 0,
   stylePreset: "corporate",
+  stylePromptVariantIndex: 0,
   imageModel: "gpt-image-1"
 };
 
@@ -138,7 +141,7 @@ const HomePage = () => {
     `Secondary brand color: ${values.secondaryBrandColor}.`,
     `Phone number: ${values.phoneNumber.trim() || "(not provided)"}.`,
     `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right, clamped so the icon stays left of the digits), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
-    `Style preset: ${values.stylePreset}.`,
+    `Style preset (${STYLE_PRESETS[values.stylePreset].label}): ${getStylePromptSentence(values.stylePreset, values.stylePromptVariantIndex)}`,
     `Image model: ${values.imageModel}.`,
     `Make it professional, clean, and suitable for ${chatExportDims.width}×${chatExportDims.height}px LinkedIn cover dimensions.`
   ].join(" ");
@@ -182,6 +185,7 @@ const HomePage = () => {
       formData.set("layoutPhoneGroupDeltaX", String(v.layoutPhoneGroupDeltaX));
       formData.set("layoutPhoneGroupDeltaY", String(v.layoutPhoneGroupDeltaY));
       formData.set("stylePreset", v.stylePreset);
+      formData.set("stylePromptVariantIndex", String(v.stylePromptVariantIndex));
       formData.set("imageModel", v.imageModel);
       formData.set("promptSnapshot", generatedPrompt);
       if (files.primaryLogo) {
@@ -335,10 +339,16 @@ const HomePage = () => {
   };
 
   const handlePatchValues = (patch: Partial<BannerFormValues>) => {
-    setValues((previous) => ({
-      ...previous,
-      ...patch
-    }));
+    setValues((previous) => {
+      const next: BannerFormValues = { ...previous, ...patch };
+      if (
+        patch.stylePreset !== undefined &&
+        patch.stylePreset !== previous.stylePreset
+      ) {
+        next.stylePromptVariantIndex = Math.floor(Math.random() * 5);
+      }
+      return next;
+    });
   };
 
   const handleResetLayout = useCallback(() => {

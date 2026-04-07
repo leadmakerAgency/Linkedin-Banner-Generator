@@ -12,6 +12,8 @@ import {
   getBannerDimensions
 } from "@/types/banner";
 
+const pickRandomStyleVariantIndex = (): number => Math.floor(Math.random() * 5);
+
 export interface BannerFiles {
   primaryLogo: File | null;
   secondaryLogo: File | null;
@@ -196,6 +198,17 @@ export const BannerForm = ({
   const FONT_SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog.";
 
   const handleInputChange = (field: keyof BannerFormValues, value: string | number) => {
+    if (field === "stylePreset") {
+      const nextPreset = value as StylePresetId;
+      if (nextPreset !== values.stylePreset) {
+        onValuesChange({
+          ...values,
+          stylePreset: nextPreset,
+          stylePromptVariantIndex: pickRandomStyleVariantIndex()
+        });
+        return;
+      }
+    }
     onValuesChange({
       ...values,
       [field]: value
