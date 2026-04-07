@@ -1,5 +1,125 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("/fonts/Roboto.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Open Sans";
+  src: url("/fonts/OpenSans.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nunito";
+  src: url("/fonts/Nunito.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Raleway";
+  src: url("/fonts/Raleway.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Oswald";
+  src: url("/fonts/Oswald.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/PlayfairDisplay.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Merriweather";
+  src: url("/fonts/Merriweather.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Work Sans";
+  src: url("/fonts/WorkSans.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans Pro";
+  src: url("/fonts/SourceSansPro.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/Manrope.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mulish";
+  src: url("/fonts/Mulish.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Quicksand";
+  src: url("/fonts/Quicksand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PT Sans";
+  src: url("/fonts/PTSans.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("/fonts/DMSans.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  src: url("/fonts/LibreBaskerville.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -22,4 +142,86 @@ body {
 ::selection {
   background: rgba(59, 130, 246, 0.35);
   color: #e2e8f0;
+}
+
+@layer utilities {
+  .font-preview-inter {
+    font-family: "Inter", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-poppins {
+    font-family: "Poppins", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-montserrat {
+    font-family: "Montserrat", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-lato {
+    font-family: "Lato", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-roboto {
+    font-family: "Roboto", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-openSans {
+    font-family: "Open Sans", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-nunito {
+    font-family: "Nunito", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-raleway {
+    font-family: "Raleway", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-oswald {
+    font-family: "Oswald", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-playfairDisplay {
+    font-family: "Playfair Display", Georgia, serif;
+  }
+
+  .font-preview-merriweather {
+    font-family: "Merriweather", Georgia, serif;
+  }
+
+  .font-preview-ubuntu {
+    font-family: "Ubuntu", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-workSans {
+    font-family: "Work Sans", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-sourceSansPro {
+    font-family: "Source Sans Pro", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-manrope {
+    font-family: "Manrope", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-mulish {
+    font-family: "Mulish", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-quicksand {
+    font-family: "Quicksand", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-ptSans {
+    font-family: "PT Sans", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-dmSans {
+    font-family: "DM Sans", "Segoe UI", sans-serif;
+  }
+
+  .font-preview-libreBaskerville {
+    font-family: "Libre Baskerville", Georgia, serif;
+  }
 }

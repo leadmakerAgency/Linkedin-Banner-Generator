@@ -47,39 +47,6 @@ const INITIAL_VALUES: BannerFormValues = {
   imageModel: "gpt-image-1"
 };
 
-const DEFAULT_GENERATION_VALUES: Pick<
-  BannerFormValues,
-  | "companyName"
-  | "companyDescription"
-  | "phoneNumber"
-  | "companyNameFontStyle"
-  | "companyDescriptionFontStyle"
-  | "companyNameFontSize"
-  | "companyDescriptionFontSize"
-  | "companyNameFontWeight"
-  | "companyDescriptionFontWeight"
-  | "companyNameColorMode"
-  | "companyNameTextColor"
-  | "companyDescriptionColorMode"
-  | "companyDescriptionTextColor"
-  | "imageModel"
-> = {
-  companyName: "Your Company",
-  companyDescription: "Lead generation through strategic marketing, virtual assistants, and call center support.",
-  phoneNumber: "+1 555 010 234",
-  companyNameFontStyle: "inter",
-  companyDescriptionFontStyle: "inter",
-  companyNameFontSize: 74,
-  companyDescriptionFontSize: 24,
-  companyNameFontWeight: "700",
-  companyDescriptionFontWeight: "500",
-  companyNameColorMode: "auto",
-  companyNameTextColor: "#FFFFFF",
-  companyDescriptionColorMode: "auto",
-  companyDescriptionTextColor: "#E2E8F0",
-  imageModel: "gpt-image-1"
-};
-
 const INITIAL_FILES: BannerFiles = {
   primaryLogo: null,
   secondaryLogo: null
@@ -146,27 +113,25 @@ const HomePage = () => {
   const chatExportDims = getBannerDimensions(values.bannerType);
   const generatedPrompt = [
     `Create a ${values.bannerType} LinkedIn banner.`,
-    `Company name: ${values.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName}.`,
-    `Company description: ${values.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription}.`,
-    `Company name font: ${values.companyNameFontStyle || DEFAULT_GENERATION_VALUES.companyNameFontStyle}.`,
-    `Description font: ${values.companyDescriptionFontStyle || DEFAULT_GENERATION_VALUES.companyDescriptionFontStyle}.`,
-    `Company name font size: ${values.companyNameFontSize || DEFAULT_GENERATION_VALUES.companyNameFontSize}px.`,
-    `Description font size: ${values.companyDescriptionFontSize || DEFAULT_GENERATION_VALUES.companyDescriptionFontSize}px.`,
-    `Company name font weight: ${values.companyNameFontWeight || DEFAULT_GENERATION_VALUES.companyNameFontWeight}.`,
-    `Description font weight: ${values.companyDescriptionFontWeight || DEFAULT_GENERATION_VALUES.companyDescriptionFontWeight}.`,
+    `Company name: ${values.companyName.trim() || "(not provided)"}.`,
+    `Company description: ${values.companyDescription.trim() || "(not provided)"}.`,
+    `Company name font: ${values.companyNameFontStyle}.`,
+    `Description font: ${values.companyDescriptionFontStyle}.`,
+    `Company name font size: ${values.companyNameFontSize}px.`,
+    `Description font size: ${values.companyDescriptionFontSize}px.`,
+    `Company name font weight: ${values.companyNameFontWeight}.`,
+    `Description font weight: ${values.companyDescriptionFontWeight}.`,
     values.companyNameColorMode === "auto"
       ? "Company name text color: Auto (AI chooses the best fitting contrast color based on the generated design)."
-      : `Company name text color (manual): ${values.companyNameTextColor || DEFAULT_GENERATION_VALUES.companyNameTextColor}.`,
+      : `Company name text color (manual): ${values.companyNameTextColor}.`,
     values.companyDescriptionColorMode === "auto"
       ? "Company description text color: Auto (AI chooses the best fitting contrast color based on the generated design)."
-      : `Company description text color (manual): ${
-          values.companyDescriptionTextColor || DEFAULT_GENERATION_VALUES.companyDescriptionTextColor
-        }.`,
+      : `Company description text color (manual): ${values.companyDescriptionTextColor}.`,
     "Phone number text color: Auto (AI chooses the best fitting contrast color based on the generated design).",
     `Company type: ${values.companyPageType}.`,
     `Primary brand color: ${values.primaryBrandColor}.`,
     `Secondary brand color: ${values.secondaryBrandColor}.`,
-    `Phone number: ${values.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber}.`,
+    `Phone number: ${values.phoneNumber.trim() || "(not provided)"}.`,
     `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right, clamped so the icon stays left of the digits), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
     `Style preset: ${values.stylePreset}.`,
     `Image model: ${values.imageModel}.`,
@@ -176,9 +141,9 @@ const HomePage = () => {
   const handleBuildFormData = useCallback(
     (forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
       const v = withClampedLayout(sourceValues ?? values);
-      const companyName = v.companyName.trim() || DEFAULT_GENERATION_VALUES.companyName;
-      const companyDescription = v.companyDescription.trim() || DEFAULT_GENERATION_VALUES.companyDescription;
-      const phoneNumber = v.phoneNumber.trim() || DEFAULT_GENERATION_VALUES.phoneNumber;
+      const companyName = v.companyName.trim();
+      const companyDescription = v.companyDescription.trim();
+      const phoneNumber = v.phoneNumber.trim();
 
       const formData = new FormData();
       formData.set("bannerType", v.bannerType);

@@ -32,8 +32,8 @@ const logoScaleField = z.preprocess(
 const generationSchema = z
   .object({
   bannerType: z.enum(["personal", "corporate"]),
-  companyName: z.string().trim().min(2).max(80),
-  companyDescription: z.string().trim().min(8).max(80),
+  companyName: z.string().trim().max(80),
+  companyDescription: z.string().trim().max(80),
   companyNameFontStyle: z.enum([
     "inter",
     "poppins",
@@ -89,7 +89,7 @@ const generationSchema = z
   companyPageType: z.enum(["company", "agency", "personal-brand"]),
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
-  phoneNumber: z.string().trim().min(6).max(40),
+  phoneNumber: z.string().trim().max(40),
   phoneIconOffsetX: z.coerce.number().int().min(-400).max(400),
   phoneIconOffsetY: z.coerce.number().int().min(-200).max(200),
   layoutPrimaryLogoDeltaX: layoutDeltaField,

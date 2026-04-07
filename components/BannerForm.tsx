@@ -62,27 +62,27 @@ const fontWeights: Array<{ value: FontWeightId; label: string }> = [
   { value: "800", label: "Extrabold (800)" }
 ];
 
-const fontStyles: Array<{ value: FontStyleId; label: string }> = [
-  { value: "inter", label: "Inter" },
-  { value: "poppins", label: "Poppins" },
-  { value: "montserrat", label: "Montserrat" },
-  { value: "lato", label: "Lato" },
-  { value: "roboto", label: "Roboto" },
-  { value: "openSans", label: "Open Sans" },
-  { value: "nunito", label: "Nunito" },
-  { value: "raleway", label: "Raleway" },
-  { value: "oswald", label: "Oswald" },
-  { value: "playfairDisplay", label: "Playfair Display" },
-  { value: "merriweather", label: "Merriweather" },
-  { value: "ubuntu", label: "Ubuntu" },
-  { value: "workSans", label: "Work Sans" },
-  { value: "sourceSansPro", label: "Source Sans Pro" },
-  { value: "manrope", label: "Manrope" },
-  { value: "mulish", label: "Mulish" },
-  { value: "quicksand", label: "Quicksand" },
-  { value: "ptSans", label: "PT Sans" },
-  { value: "dmSans", label: "DM Sans" },
-  { value: "libreBaskerville", label: "Libre Baskerville" }
+const fontStyles: Array<{ value: FontStyleId; label: string; previewClassName: string }> = [
+  { value: "inter", label: "Inter", previewClassName: "font-preview-inter" },
+  { value: "poppins", label: "Poppins", previewClassName: "font-preview-poppins" },
+  { value: "montserrat", label: "Montserrat", previewClassName: "font-preview-montserrat" },
+  { value: "lato", label: "Lato", previewClassName: "font-preview-lato" },
+  { value: "roboto", label: "Roboto", previewClassName: "font-preview-roboto" },
+  { value: "openSans", label: "Open Sans", previewClassName: "font-preview-openSans" },
+  { value: "nunito", label: "Nunito", previewClassName: "font-preview-nunito" },
+  { value: "raleway", label: "Raleway", previewClassName: "font-preview-raleway" },
+  { value: "oswald", label: "Oswald", previewClassName: "font-preview-oswald" },
+  { value: "playfairDisplay", label: "Playfair Display", previewClassName: "font-preview-playfairDisplay" },
+  { value: "merriweather", label: "Merriweather", previewClassName: "font-preview-merriweather" },
+  { value: "ubuntu", label: "Ubuntu", previewClassName: "font-preview-ubuntu" },
+  { value: "workSans", label: "Work Sans", previewClassName: "font-preview-workSans" },
+  { value: "sourceSansPro", label: "Source Sans Pro", previewClassName: "font-preview-sourceSansPro" },
+  { value: "manrope", label: "Manrope", previewClassName: "font-preview-manrope" },
+  { value: "mulish", label: "Mulish", previewClassName: "font-preview-mulish" },
+  { value: "quicksand", label: "Quicksand", previewClassName: "font-preview-quicksand" },
+  { value: "ptSans", label: "PT Sans", previewClassName: "font-preview-ptSans" },
+  { value: "dmSans", label: "DM Sans", previewClassName: "font-preview-dmSans" },
+  { value: "libreBaskerville", label: "Libre Baskerville", previewClassName: "font-preview-libreBaskerville" }
 ];
 
 export const BannerForm = ({
@@ -92,6 +92,10 @@ export const BannerForm = ({
   onValuesChange,
   onFilesChange
 }: BannerFormProps) => {
+  const selectedCompanyNameFont = fontStyles.find((fontStyle) => fontStyle.value === values.companyNameFontStyle) ?? fontStyles[0];
+  const selectedDescriptionFont =
+    fontStyles.find((fontStyle) => fontStyle.value === values.companyDescriptionFontStyle) ?? fontStyles[0];
+
   const handleInputChange = (field: keyof BannerFormValues, value: string | number) => {
     onValuesChange({
       ...values,
@@ -159,23 +163,30 @@ export const BannerForm = ({
             value={values.companyName}
             onChange={(event) => handleInputChange("companyName", event.target.value)}
             placeholder="LeadMaker Hub"
-            required
           />
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Company Name Font
-          <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.companyNameFontStyle}
-            onChange={(event) => handleInputChange("companyNameFontStyle", event.target.value)}
-          >
-            {fontStyles.map((fontStyle) => (
-              <option key={fontStyle.value} value={fontStyle.value}>
-                {fontStyle.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3">
+            <select
+              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+              value={values.companyNameFontStyle}
+              onChange={(event) => handleInputChange("companyNameFontStyle", event.target.value)}
+            >
+              {fontStyles.map((fontStyle) => (
+                <option key={fontStyle.value} value={fontStyle.value}>
+                  {fontStyle.label}
+                </option>
+              ))}
+            </select>
+            <span
+              className={`${selectedCompanyNameFont.previewClassName} shrink-0 rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs font-medium text-slate-200`}
+              aria-label={`Company name font preview for ${selectedCompanyNameFont.label}`}
+            >
+              Aa Bb 123
+            </span>
+          </div>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
@@ -248,24 +259,31 @@ export const BannerForm = ({
             onChange={(event) => handleInputChange("companyDescription", event.target.value)}
             placeholder="Lead Generation through strategic marketing campaigns, virtual assistants, and call centers in the Philippines and beyond."
             maxLength={80}
-            required
           />
           <span className="text-xs font-normal text-slate-400">{values.companyDescription.length}/80</span>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Description Font
-          <select
-            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
-            value={values.companyDescriptionFontStyle}
-            onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
-          >
-            {fontStyles.map((fontStyle) => (
-              <option key={fontStyle.value} value={fontStyle.value}>
-                {fontStyle.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3">
+            <select
+              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+              value={values.companyDescriptionFontStyle}
+              onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
+            >
+              {fontStyles.map((fontStyle) => (
+                <option key={fontStyle.value} value={fontStyle.value}>
+                  {fontStyle.label}
+                </option>
+              ))}
+            </select>
+            <span
+              className={`${selectedDescriptionFont.previewClassName} shrink-0 rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs font-medium text-slate-200`}
+              aria-label={`Description font preview for ${selectedDescriptionFont.label}`}
+            >
+              Aa Bb 123
+            </span>
+          </div>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
@@ -359,7 +377,6 @@ export const BannerForm = ({
             value={values.phoneNumber}
             onChange={(event) => handleInputChange("phoneNumber", event.target.value)}
             placeholder="+1 555 010 234"
-            required
           />
         </label>
 
