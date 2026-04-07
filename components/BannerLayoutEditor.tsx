@@ -31,7 +31,14 @@ const clampLayoutDelta = (value: number): number => Math.max(-2000, Math.min(200
 const handleClass =
   "pointer-events-auto absolute z-10 box-border touch-none cursor-grab rounded-lg border border-dashed border-sky-400/80 bg-sky-500/20 shadow-sm active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-sky-400";
 
-const resizeHandleClass =
+const RESIZE_CORNER_CURSOR: Record<ResizeCorner, string> = {
+  nw: "cursor-nwse-resize",
+  se: "cursor-nwse-resize",
+  ne: "cursor-nesw-resize",
+  sw: "cursor-nesw-resize"
+};
+
+const resizeHandleBaseClass =
   "pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 touch-none rounded-sm border border-sky-200 bg-sky-500 shadow";
 
 const rectToStyle = (
@@ -222,9 +229,10 @@ export const BannerLayoutEditor = ({
   ) => {
     const dx = nextRect.left - startRect.left;
     const dy = nextRect.top - startRect.top;
+    const roundedScalePct = Math.round(clampUniformScalePct(nextScalePct, MIN_LOGO_SCALE_PCT, MAX_LOGO_SCALE_PCT));
     if (group === "primary") {
       onLayoutDeltaChange({
-        layoutPrimaryLogoScalePct: clampUniformScalePct(nextScalePct, MIN_LOGO_SCALE_PCT, MAX_LOGO_SCALE_PCT),
+        layoutPrimaryLogoScalePct: roundedScalePct,
         layoutPrimaryLogoDeltaX: clampLayoutDelta(values.layoutPrimaryLogoDeltaX + dx),
         layoutPrimaryLogoDeltaY: clampLayoutDelta(values.layoutPrimaryLogoDeltaY + dy)
       });
@@ -233,7 +241,7 @@ export const BannerLayoutEditor = ({
     }
 
     onLayoutDeltaChange({
-      layoutSecondaryLogoScalePct: clampUniformScalePct(nextScalePct, MIN_LOGO_SCALE_PCT, MAX_LOGO_SCALE_PCT),
+      layoutSecondaryLogoScalePct: roundedScalePct,
       layoutSecondaryLogoDeltaX: clampLayoutDelta(values.layoutSecondaryLogoDeltaX + dx),
       layoutSecondaryLogoDeltaY: clampLayoutDelta(values.layoutSecondaryLogoDeltaY + dy)
     });
@@ -427,7 +435,7 @@ export const BannerLayoutEditor = ({
         role="button"
         tabIndex={0}
         aria-label={handle.label}
-        className={resizeHandleClass}
+        className={`${resizeHandleBaseClass} ${RESIZE_CORNER_CURSOR[handle.corner]}`}
         style={{ left: handle.left, top: handle.top }}
         onPointerDown={(event) => startResize(event, group, handle.corner, rect, scalePct)}
         onPointerMove={updateResize}
