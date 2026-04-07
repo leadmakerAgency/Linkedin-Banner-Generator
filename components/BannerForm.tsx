@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   BannerFormValues,
   BannerType,
@@ -108,6 +109,83 @@ const FONT_PREVIEW_CLASS: Record<FontStyleId, string> = {
   libreBaskerville: "font-preview-libreBaskerville"
 };
 
+interface FontStylePickerProps {
+  value: FontStyleId;
+  onChange: (next: FontStyleId) => void;
+  ariaLabel: string;
+  sampleText: string;
+}
+
+const FontStylePicker = ({ value, onChange, ariaLabel, sampleText }: FontStylePickerProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selectedStyle = fontStyles.find((item) => item.value === value) ?? fontStyles[0];
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((previous) => !previous)}
+        className={`flex w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-left text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 ${FONT_PREVIEW_CLASS[selectedStyle.value]}`}
+      >
+        <span className="truncate">{`${selectedStyle.label} - ${sampleText}`}</span>
+        <span className="ml-3 text-slate-400">{isOpen ? "▲" : "▼"}</span>
+      </button>
+      {isOpen ? (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900/95 p-1 shadow-2xl backdrop-blur"
+        >
+          {fontStyles.map((fontStyle) => (
+            <button
+              key={fontStyle.value}
+              type="button"
+              role="option"
+              aria-selected={fontStyle.value === value}
+              onClick={() => {
+                onChange(fontStyle.value);
+                setIsOpen(false);
+              }}
+              className={`block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-slate-800/90 ${fontStyle.value === value ? "bg-slate-800" : "bg-transparent"} ${FONT_PREVIEW_CLASS[fontStyle.value]}`}
+            >
+              {`${fontStyle.label} - ${sampleText}`}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 export const BannerForm = ({
   values,
   files,
@@ -189,17 +267,12 @@ export const BannerForm = ({
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Company Name Font
-          <select
-            className={`rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 ${FONT_PREVIEW_CLASS[values.companyNameFontStyle]}`}
+          <FontStylePicker
             value={values.companyNameFontStyle}
-            onChange={(event) => handleInputChange("companyNameFontStyle", event.target.value)}
-          >
-            {fontStyles.map((fontStyle) => (
-              <option key={fontStyle.value} value={fontStyle.value}>
-                {`${fontStyle.label} - ${FONT_SAMPLE_TEXT}`}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => handleInputChange("companyNameFontStyle", next)}
+            ariaLabel="Company name font"
+            sampleText={FONT_SAMPLE_TEXT}
+          />
           <span className={`text-xs font-normal text-slate-400 ${FONT_PREVIEW_CLASS[values.companyNameFontStyle]}`}>
             {FONT_SAMPLE_TEXT}
           </span>
@@ -281,17 +354,12 @@ export const BannerForm = ({
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Description Font
-          <select
-            className={`rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 ${FONT_PREVIEW_CLASS[values.companyDescriptionFontStyle]}`}
+          <FontStylePicker
             value={values.companyDescriptionFontStyle}
-            onChange={(event) => handleInputChange("companyDescriptionFontStyle", event.target.value)}
-          >
-            {fontStyles.map((fontStyle) => (
-              <option key={fontStyle.value} value={fontStyle.value}>
-                {`${fontStyle.label} - ${FONT_SAMPLE_TEXT}`}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => handleInputChange("companyDescriptionFontStyle", next)}
+            ariaLabel="Description font"
+            sampleText={FONT_SAMPLE_TEXT}
+          />
           <span className={`text-xs font-normal text-slate-400 ${FONT_PREVIEW_CLASS[values.companyDescriptionFontStyle]}`}>
             {FONT_SAMPLE_TEXT}
           </span>
