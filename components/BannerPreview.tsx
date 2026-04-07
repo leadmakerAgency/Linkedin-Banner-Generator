@@ -1,7 +1,7 @@
 "use client";
 import { type PreviewViewport, BannerLayoutEditor } from "@/components/BannerLayoutEditor";
 import type { LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
-import { getBannerDimensions, type BannerFormValues, type LayoutOverlayPayload } from "@/types/banner";
+import { getBannerDimensions, type BannerFormValues, type LayoutElementRect, type LayoutOverlayPayload } from "@/types/banner";
 import { useLayoutEffect, useRef, useState } from "react";
 
 interface BannerPreviewProps {
@@ -20,6 +20,7 @@ interface BannerPreviewProps {
   layoutOverlayActive: boolean;
   layoutOverlay: LayoutOverlayPayload | null;
   onLayoutDragNudge: (group: LayoutDragGroup, dxBanner: number, dyBanner: number) => void;
+  onLayoutResizeNudge: (group: "primary" | "secondary", rect: LayoutElementRect) => void;
   hasPrimaryLogo: boolean;
   hasSecondaryLogo: boolean;
 }
@@ -38,6 +39,7 @@ export const BannerPreview = ({
   layoutOverlayActive,
   layoutOverlay,
   onLayoutDragNudge,
+  onLayoutResizeNudge,
   hasPrimaryLogo,
   hasSecondaryLogo
 }: BannerPreviewProps) => {
@@ -141,6 +143,7 @@ export const BannerPreview = ({
                 layoutOverlay={layoutOverlay}
                 onLayoutDeltaChange={onLayoutDeltaChange}
                 onLayoutDragNudge={onLayoutDragNudge}
+                onLayoutResizeNudge={onLayoutResizeNudge}
                 hasPrimaryLogo={hasPrimaryLogo}
                 hasSecondaryLogo={hasSecondaryLogo}
                 previewViewport={previewViewport}

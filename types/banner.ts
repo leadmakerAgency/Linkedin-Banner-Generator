@@ -91,9 +91,13 @@ export interface BannerFormValues {
   /** Draggable layout: added to default primary logo top-left (banner px). */
   layoutPrimaryLogoDeltaX: number;
   layoutPrimaryLogoDeltaY: number;
+  /** Scale percent applied to primary logo max box (100 = default size). */
+  layoutPrimaryLogoScalePct: number;
   /** Draggable layout: added to default secondary logo position. */
   layoutSecondaryLogoDeltaX: number;
   layoutSecondaryLogoDeltaY: number;
+  /** Scale percent applied to secondary logo max box (100 = default size). */
+  layoutSecondaryLogoScalePct: number;
   /** Draggable layout: shifts company name + description lines together. */
   layoutTextBlockDeltaX: number;
   layoutTextBlockDeltaY: number;

@@ -24,6 +24,10 @@ const layoutDeltaField = z.preprocess(
   (val) => (typeof val === "string" && val.trim() === "" ? 0 : val),
   z.coerce.number().int().min(-20000).max(20000)
 );
+const logoScaleField = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? 100 : val),
+  z.coerce.number().int().min(25).max(400)
+);
 
 const generationSchema = z
   .object({
@@ -90,8 +94,10 @@ const generationSchema = z
   phoneIconOffsetY: z.coerce.number().int().min(-200).max(200),
   layoutPrimaryLogoDeltaX: layoutDeltaField,
   layoutPrimaryLogoDeltaY: layoutDeltaField,
+  layoutPrimaryLogoScalePct: logoScaleField,
   layoutSecondaryLogoDeltaX: layoutDeltaField,
   layoutSecondaryLogoDeltaY: layoutDeltaField,
+  layoutSecondaryLogoScalePct: logoScaleField,
   layoutTextBlockDeltaX: layoutDeltaField,
   layoutTextBlockDeltaY: layoutDeltaField,
   layoutPhoneGroupDeltaX: layoutDeltaField,
@@ -219,7 +225,7 @@ export const readBackgroundBufferFromPublicUrl = async (publicUrl: string): Prom
 };
 
 const resizeLogoBuffer = async (buffer: Buffer, maxWidth: number, maxHeight: number): Promise<Buffer> => {
-  return sharp(buffer).resize({ width: maxWidth, height: maxHeight, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+  return sharp(buffer).resize({ width: maxWidth, height: maxHeight, fit: "inside" }).png().toBuffer();
 };
 
 const wrapTextLines = (text: string, maxLineLength: number, maxLines: number): string[] => {
@@ -324,8 +330,10 @@ export const overlayBrandElements = async (
   const refW = 1584;
   const refH = 396;
 
-  const maxLogoWidth = Math.round(L.LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
-  const maxLogoHeight = Math.round(L.LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale);
+  const primaryLogoScale = values.layoutPrimaryLogoScalePct / 100;
+  const secondaryLogoScale = values.layoutSecondaryLogoScalePct / 100;
+  const maxLogoWidth = Math.round(L.LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale * primaryLogoScale);
+  const maxLogoHeight = Math.round(L.LAYOUT_PRIMARY_LOGO_BOX * patchLogoScale * primaryLogoScale);
   const margin = L.LAYOUT_MARGIN;
   const logoTopLeft = L.LAYOUT_LOGO_TOP;
   const contentStartX = L.LAYOUT_CONTENT_START_X + values.layoutTextBlockDeltaX;
@@ -349,8 +357,8 @@ export const overlayBrandElements = async (
   if (secondaryLogo) {
     secondaryBuffer = await resizeLogoBuffer(
       Buffer.from(await secondaryLogo.arrayBuffer()),
-      L.LAYOUT_SECONDARY_LOGO_BOX,
-      L.LAYOUT_SECONDARY_LOGO_BOX
+      Math.round(L.LAYOUT_SECONDARY_LOGO_BOX * secondaryLogoScale),
+      Math.round(L.LAYOUT_SECONDARY_LOGO_BOX * secondaryLogoScale)
     );
     const meta = await sharp(secondaryBuffer).metadata();
     secondaryWidth = meta.width ?? 0;
@@ -654,8 +662,10 @@ export const parseBannerInput = (formData: FormData): {
     phoneIconOffsetY: parseFormValue(formData.get("phoneIconOffsetY")),
     layoutPrimaryLogoDeltaX: parseFormValue(formData.get("layoutPrimaryLogoDeltaX")),
     layoutPrimaryLogoDeltaY: parseFormValue(formData.get("layoutPrimaryLogoDeltaY")),
+    layoutPrimaryLogoScalePct: parseFormValue(formData.get("layoutPrimaryLogoScalePct")),
     layoutSecondaryLogoDeltaX: parseFormValue(formData.get("layoutSecondaryLogoDeltaX")),
     layoutSecondaryLogoDeltaY: parseFormValue(formData.get("layoutSecondaryLogoDeltaY")),
+    layoutSecondaryLogoScalePct: parseFormValue(formData.get("layoutSecondaryLogoScalePct")),
     layoutTextBlockDeltaX: parseFormValue(formData.get("layoutTextBlockDeltaX")),
     layoutTextBlockDeltaY: parseFormValue(formData.get("layoutTextBlockDeltaY")),
     layoutPhoneGroupDeltaX: parseFormValue(formData.get("layoutPhoneGroupDeltaX")),

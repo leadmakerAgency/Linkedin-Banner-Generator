@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { BannerPreview } from "@/components/BannerPreview";
-import { nudgeLayoutOverlay, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
+import { nudgeLayoutOverlay, nudgeLayoutOverlayResize, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { LayoutOverlayPayload } from "@/types/banner";
 import {
   BannerFormValues,
@@ -35,8 +35,10 @@ const INITIAL_VALUES: BannerFormValues = {
   phoneIconOffsetY: 0,
   layoutPrimaryLogoDeltaX: 0,
   layoutPrimaryLogoDeltaY: 0,
+  layoutPrimaryLogoScalePct: 100,
   layoutSecondaryLogoDeltaX: 0,
   layoutSecondaryLogoDeltaY: 0,
+  layoutSecondaryLogoScalePct: 100,
   layoutTextBlockDeltaX: 0,
   layoutTextBlockDeltaY: 0,
   layoutPhoneGroupDeltaX: 0,
@@ -93,8 +95,10 @@ const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
   phoneIconOffsetY: 0,
   layoutPrimaryLogoDeltaX: 0,
   layoutPrimaryLogoDeltaY: 0,
+  layoutPrimaryLogoScalePct: 100,
   layoutSecondaryLogoDeltaX: 0,
   layoutSecondaryLogoDeltaY: 0,
+  layoutSecondaryLogoScalePct: 100,
   layoutTextBlockDeltaX: 0,
   layoutTextBlockDeltaY: 0,
   layoutPhoneGroupDeltaX: 0,
@@ -102,13 +106,16 @@ const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
 });
 
 const clampLayoutDelta = (value: number): number => Math.max(-2000, Math.min(2000, value));
+const clampLogoScalePct = (value: number): number => Math.max(25, Math.min(400, value));
 
 const withClampedLayout = (base: BannerFormValues): BannerFormValues => ({
   ...base,
   layoutPrimaryLogoDeltaX: clampLayoutDelta(base.layoutPrimaryLogoDeltaX),
   layoutPrimaryLogoDeltaY: clampLayoutDelta(base.layoutPrimaryLogoDeltaY),
+  layoutPrimaryLogoScalePct: clampLogoScalePct(base.layoutPrimaryLogoScalePct),
   layoutSecondaryLogoDeltaX: clampLayoutDelta(base.layoutSecondaryLogoDeltaX),
   layoutSecondaryLogoDeltaY: clampLayoutDelta(base.layoutSecondaryLogoDeltaY),
+  layoutSecondaryLogoScalePct: clampLogoScalePct(base.layoutSecondaryLogoScalePct),
   layoutTextBlockDeltaX: clampLayoutDelta(base.layoutTextBlockDeltaX),
   layoutTextBlockDeltaY: clampLayoutDelta(base.layoutTextBlockDeltaY),
   layoutPhoneGroupDeltaX: clampLayoutDelta(base.layoutPhoneGroupDeltaX),
@@ -196,8 +203,10 @@ const HomePage = () => {
       formData.set("phoneIconOffsetY", "0");
       formData.set("layoutPrimaryLogoDeltaX", String(v.layoutPrimaryLogoDeltaX));
       formData.set("layoutPrimaryLogoDeltaY", String(v.layoutPrimaryLogoDeltaY));
+      formData.set("layoutPrimaryLogoScalePct", String(v.layoutPrimaryLogoScalePct));
       formData.set("layoutSecondaryLogoDeltaX", String(v.layoutSecondaryLogoDeltaX));
       formData.set("layoutSecondaryLogoDeltaY", String(v.layoutSecondaryLogoDeltaY));
+      formData.set("layoutSecondaryLogoScalePct", String(v.layoutSecondaryLogoScalePct));
       formData.set("layoutTextBlockDeltaX", String(v.layoutTextBlockDeltaX));
       formData.set("layoutTextBlockDeltaY", String(v.layoutTextBlockDeltaY));
       formData.set("layoutPhoneGroupDeltaX", String(v.layoutPhoneGroupDeltaX));
@@ -293,8 +302,10 @@ const HomePage = () => {
       ...previous,
       layoutPrimaryLogoDeltaX: 0,
       layoutPrimaryLogoDeltaY: 0,
+      layoutPrimaryLogoScalePct: 100,
       layoutSecondaryLogoDeltaX: 0,
       layoutSecondaryLogoDeltaY: 0,
+      layoutSecondaryLogoScalePct: 100,
       layoutTextBlockDeltaX: 0,
       layoutTextBlockDeltaY: 0,
       layoutPhoneGroupDeltaX: 0,
@@ -306,6 +317,13 @@ const HomePage = () => {
     setLayoutOverlay((previous) => nudgeLayoutOverlay(previous, group, dx, dy));
   }, []);
 
+  const handleLayoutResizeNudge = useCallback(
+    (group: "primary" | "secondary", rect: { left: number; top: number; width: number; height: number }) => {
+      setLayoutOverlay((previous) => nudgeLayoutOverlayResize(previous, group, rect));
+    },
+    []
+  );
+
   useEffect(() => {
     setPromptSnapshot(generatedPrompt);
   }, [generatedPrompt]);
@@ -316,8 +334,10 @@ const HomePage = () => {
       const unchanged =
         clamped.layoutPrimaryLogoDeltaX === previous.layoutPrimaryLogoDeltaX &&
         clamped.layoutPrimaryLogoDeltaY === previous.layoutPrimaryLogoDeltaY &&
+        clamped.layoutPrimaryLogoScalePct === previous.layoutPrimaryLogoScalePct &&
         clamped.layoutSecondaryLogoDeltaX === previous.layoutSecondaryLogoDeltaX &&
         clamped.layoutSecondaryLogoDeltaY === previous.layoutSecondaryLogoDeltaY &&
+        clamped.layoutSecondaryLogoScalePct === previous.layoutSecondaryLogoScalePct &&
         clamped.layoutTextBlockDeltaX === previous.layoutTextBlockDeltaX &&
         clamped.layoutTextBlockDeltaY === previous.layoutTextBlockDeltaY &&
         clamped.layoutPhoneGroupDeltaX === previous.layoutPhoneGroupDeltaX &&
@@ -344,8 +364,10 @@ const HomePage = () => {
       ...DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE[values.bannerType],
       layoutPrimaryLogoDeltaX: 0,
       layoutPrimaryLogoDeltaY: 0,
+      layoutPrimaryLogoScalePct: 100,
       layoutSecondaryLogoDeltaX: 0,
       layoutSecondaryLogoDeltaY: 0,
+      layoutSecondaryLogoScalePct: 100,
       layoutTextBlockDeltaX: 0,
       layoutTextBlockDeltaY: 0,
       layoutPhoneGroupDeltaX: 0,
@@ -475,6 +497,7 @@ const HomePage = () => {
             layoutOverlayActive={Boolean(previewUrl && hasBackground)}
             layoutOverlay={layoutOverlay}
             onLayoutDragNudge={handleLayoutDragNudge}
+            onLayoutResizeNudge={handleLayoutResizeNudge}
             hasPrimaryLogo={Boolean(files.primaryLogo)}
             hasSecondaryLogo={Boolean(files.secondaryLogo)}
           />
