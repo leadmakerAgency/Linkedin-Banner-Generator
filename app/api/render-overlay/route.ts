@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { assertBackgroundPathForDesign } from "@/lib/bannerAssetPath";
+import {
+  assertBackgroundPathForDesign,
+  parseDesignIdFromBackgroundStoragePath,
+  uuidStringsEqual
+} from "@/lib/bannerAssetPath";
 import { resolveBackgroundBufferForOverlay } from "@/lib/bannerBackgroundLoader";
 import { isTrustedBackgroundHttpsUrl, isTrustedSupabaseStorageObjectUrl } from "@/lib/backgroundSource";
 import {
@@ -13,6 +17,7 @@ import {
   parseBannerInput,
   runOverlayRender
 } from "@/lib/generateBanner";
+import { getPersistOwnerOrErrorResponse } from "@/lib/requirePersistAuth";
 import type { BannerGenerationInput } from "@/types/banner";
 import { appendCacheBustParam, stripCacheBustParam } from "@/lib/stripCacheBust";
 
@@ -42,7 +47,18 @@ export const POST = async (request: Request) => {
       isBannerDesignPersistenceEnabled() && Boolean(designId && backgroundStoragePath);
 
     if (persistOverlay) {
-      assertBackgroundPathForDesign(backgroundStoragePath!, designId!);
+      const owner = await getPersistOwnerOrErrorResponse();
+      if (!owner.ok) {
+        return owner.response;
+      }
+      const canonicalDesignId = parseDesignIdFromBackgroundStoragePath(backgroundStoragePath!);
+      if (!canonicalDesignId || !uuidStringsEqual(canonicalDesignId, designId!)) {
+        return NextResponse.json(
+          { error: "designId must match the UUID in backgroundStoragePath (backgrounds/{designId}/…)." },
+          { status: 400 }
+        );
+      }
+      assertBackgroundPathForDesign(backgroundStoragePath!, canonicalDesignId);
       const backgroundUrlRaw = formData.get("backgroundUrl");
       const buffer = await resolveBackgroundBufferForOverlay({
         backgroundStoragePath,
@@ -68,7 +84,8 @@ export const POST = async (request: Request) => {
       );
 
       const { previewStoragePath } = await appendOverlayVersion({
-        designId: designId!,
+        ownerUserId: owner.userId,
+        designId: canonicalDesignId,
         snapshot: {
           form: toPersistedFormValues(overlayValues),
           promptSnapshot,
@@ -84,7 +101,7 @@ export const POST = async (request: Request) => {
         imageUrl: appendCacheBustParam(signedPreview),
         filename: previewStoragePath.split("/").pop() ?? "preview.png",
         layoutOverlay,
-        designId
+        designId: canonicalDesignId
       });
     }
 

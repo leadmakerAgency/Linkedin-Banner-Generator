@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { BannerPreview } from "@/components/BannerPreview";
 import { DesignHistoryPanel } from "@/components/DesignHistoryPanel";
@@ -18,6 +19,7 @@ import {
   PHONE_NUMBER_FONT_SIZE_LIMITS,
   getBannerDimensions
 } from "@/types/banner";
+import { parseDesignIdFromBackgroundStoragePath, uuidStringsEqual } from "@/lib/bannerAssetPath";
 import { stripCacheBustParam } from "@/lib/stripCacheBust";
 
 const INITIAL_VALUES: BannerFormValues = {
@@ -121,6 +123,7 @@ const HomePage = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [layoutOverlay, setLayoutOverlay] = useState<LayoutOverlayPayload | null>(null);
   const overlayRequestId = useRef(0);
+  const overlayFetchAbortRef = useRef<AbortController | null>(null);
   const previousBannerType = useRef<BannerType | null>(null);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -220,8 +223,11 @@ const HomePage = () => {
         formData.set("regenerateNonce", generateNonce());
       }
       if (includeDesignSession && activeDesignId && backgroundStoragePath) {
-        formData.set("designId", activeDesignId);
-        formData.set("backgroundStoragePath", backgroundStoragePath);
+        const pathDesignId = parseDesignIdFromBackgroundStoragePath(backgroundStoragePath);
+        if (pathDesignId && uuidStringsEqual(pathDesignId, activeDesignId)) {
+          formData.set("designId", pathDesignId);
+          formData.set("backgroundStoragePath", backgroundStoragePath);
+        }
       }
 
       return formData;
@@ -250,6 +256,7 @@ const HomePage = () => {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
+        credentials: "include",
         body: handleBuildFormData(forceFresh, sourceValues)
       });
       const data = (await response.json()) as {
@@ -331,6 +338,7 @@ const HomePage = () => {
       formData.set("file", importFile);
       const response = await fetch("/api/import-background", {
         method: "POST",
+        credentials: "include",
         body: formData
       });
       const data = (await response.json()) as {
@@ -372,6 +380,7 @@ const HomePage = () => {
       formData.set("imageUrl", trimmedUrl);
       const response = await fetch("/api/import-background", {
         method: "POST",
+        credentials: "include",
         body: formData
       });
       const data = (await response.json()) as {
@@ -446,6 +455,7 @@ const HomePage = () => {
       designId: string | null;
       files: BannerFiles;
     }) => {
+      previousBannerType.current = payload.values.bannerType;
       setValues(withClampedLayout(payload.values));
       setPromptSnapshot(payload.promptSnapshot);
       setFiles(payload.files);
@@ -521,6 +531,10 @@ const HomePage = () => {
     }
 
     const timer = window.setTimeout(() => {
+      overlayFetchAbortRef.current?.abort();
+      const abortController = new AbortController();
+      overlayFetchAbortRef.current = abortController;
+
       const requestId = overlayRequestId.current + 1;
       overlayRequestId.current = requestId;
       setIsLoadingOverlay(true);
@@ -533,7 +547,9 @@ const HomePage = () => {
         try {
           const response = await fetch("/api/render-overlay", {
             method: "POST",
-            body: formData
+            credentials: "include",
+            body: formData,
+            signal: abortController.signal
           });
           const data = (await response.json()) as {
             imageUrl?: string;
@@ -555,7 +571,10 @@ const HomePage = () => {
           if (data.designId) {
             setActiveDesignId(data.designId);
           }
-        } catch {
+        } catch (cause) {
+          if (cause instanceof DOMException && cause.name === "AbortError") {
+            return;
+          }
           if (overlayRequestId.current === requestId) {
             setErrorMessage("Unable to render overlay. Please retry.");
           }
@@ -567,7 +586,11 @@ const HomePage = () => {
       })();
     }, 400);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      overlayFetchAbortRef.current?.abort();
+      overlayFetchAbortRef.current = null;
+    };
   }, [backgroundUrl, backgroundStoragePath, values, files, handleBuildFormData]);
 
   const displayUrl = previewUrl ?? backgroundUrl;
@@ -576,16 +599,26 @@ const HomePage = () => {
   return (
     <main className="min-h-screen px-4 py-8 md:px-8">
       <div className="mx-auto mb-6 w-full max-w-[1460px] rounded-3xl border border-slate-800/90 bg-slate-900/75 p-5 shadow-[0_22px_60px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl md:p-7">
-        <div className="flex items-center gap-4">
-          <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-2 shadow-inner shadow-blue-500/10">
-            <Image src="/leadmaker-logo.png" alt="LeadMaker" width={44} height={44} priority />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/70 p-2 shadow-inner shadow-blue-500/10">
+              <Image src="/leadmaker-logo.png" alt="LeadMaker" width={44} height={44} priority />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">
+                LeadMaker LinkedIn Banner Generator
+              </h1>
+              <p className="mt-2 text-sm text-slate-300 md:text-base">
+                Build high-quality LinkedIn banners with guided settings, AI assistance, and deterministic brand overlays.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">LeadMaker LinkedIn Banner Generator</h1>
-            <p className="mt-2 text-sm text-slate-300 md:text-base">
-              Build high-quality LinkedIn banners with guided settings, AI assistance, and deterministic brand overlays.
-            </p>
-          </div>
+          <Link
+            href="/login"
+            className="shrink-0 rounded-xl border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 transition hover:bg-slate-800/80"
+          >
+            Sign in
+          </Link>
         </div>
       </div>
 
@@ -613,8 +646,8 @@ const HomePage = () => {
                 </button>
               </div>
               <p className="mb-2 text-xs text-slate-400">
-                Prompt updates automatically from your form values. When Supabase is configured, designs are saved to
-                history after backgrounds and overlays.
+                Prompt updates automatically from your form values. When Supabase persistence is enabled, backgrounds and
+                overlays are saved to your account after you sign in.
               </p>
               <textarea
                 readOnly

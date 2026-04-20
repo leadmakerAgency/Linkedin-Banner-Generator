@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
-import { createSignedAssetUrl, designsApiSecretOk, listDesignsForHistory } from "@/lib/bannerDesigns";
+import { createSignedAssetUrl, isBannerDesignPersistenceEnabled, listDesignsForHistory } from "@/lib/bannerDesigns";
+import { getSessionUserOrNull, isSupabaseSessionAuthConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-export const GET = async (request: Request) => {
-  if (!designsApiSecretOk(request)) {
+export const GET = async () => {
+  if (!isBannerDesignPersistenceEnabled()) {
+    return NextResponse.json({ error: "Design history is not configured on this server." }, { status: 503 });
+  }
+  if (!isSupabaseSessionAuthConfigured()) {
+    return NextResponse.json({ error: "Supabase Auth is not configured." }, { status: 503 });
+  }
+
+  const user = await getSessionUserOrNull();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   try {
-    const rows = await listDesignsForHistory(50);
+    const rows = await listDesignsForHistory(50, user.id);
     const designs = await Promise.all(
       rows.map(async (row) => ({
         id: row.id,

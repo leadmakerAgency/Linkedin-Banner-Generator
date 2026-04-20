@@ -5,6 +5,7 @@ const PATH_RE = new RegExp(
   `^(backgrounds|previews|logos)/(${UUID_SEGMENT})/[a-zA-Z0-9._-]+\\.png$`,
   "i"
 );
+const BACKGROUND_PATH_DESIGN_ID = new RegExp(`^backgrounds/(${UUID_SEGMENT})/`, "i");
 /** Flat keys from `saveOutputPng` when using Supabase without structured design paths. */
 const LEGACY_GENERATED_RE = /^legacy-generated\/[0-9a-f-]{36}\.png$/i;
 
@@ -23,5 +24,14 @@ export const assertBackgroundPathForDesign = (path: string, designId: string): v
     throw new Error("Background path does not match design.");
   }
 };
+
+/** UUID folder segment under `backgrounds/{uuid}/…` (authoritative for persisted sessions). */
+export const parseDesignIdFromBackgroundStoragePath = (storagePath: string): string | null => {
+  const m = storagePath.trim().match(BACKGROUND_PATH_DESIGN_ID);
+  return m ? m[1].toLowerCase() : null;
+};
+
+export const uuidStringsEqual = (a: string, b: string): boolean =>
+  a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export const newAssetFileName = (): string => `${randomUUID()}.png`;

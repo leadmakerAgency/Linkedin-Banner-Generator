@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSignedAssetUrl, designsApiSecretOk, getDesignDetailForEdit } from "@/lib/bannerDesigns";
+import { createSignedAssetUrl, getDesignDetailForEdit, isBannerDesignPersistenceEnabled } from "@/lib/bannerDesigns";
+import { getSessionUserOrNull, isSupabaseSessionAuthConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -7,14 +8,22 @@ type RouteContext = {
   params: Promise<{ designId: string }>;
 };
 
-export const GET = async (request: Request, context: RouteContext) => {
-  if (!designsApiSecretOk(request)) {
+export const GET = async (_request: Request, context: RouteContext) => {
+  if (!isBannerDesignPersistenceEnabled()) {
+    return NextResponse.json({ error: "Design history is not configured on this server." }, { status: 503 });
+  }
+  if (!isSupabaseSessionAuthConfigured()) {
+    return NextResponse.json({ error: "Supabase Auth is not configured." }, { status: 503 });
+  }
+
+  const user = await getSessionUserOrNull();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   try {
     const { designId } = await context.params;
-    const detail = await getDesignDetailForEdit(designId);
+    const detail = await getDesignDetailForEdit(designId, user.id);
     const backgroundSignedUrl = await createSignedAssetUrl(detail.backgroundStoragePath);
     const primaryLogoSignedUrl = detail.primaryLogoPath ? await createSignedAssetUrl(detail.primaryLogoPath) : null;
     const secondaryLogoSignedUrl = detail.secondaryLogoPath ? await createSignedAssetUrl(detail.secondaryLogoPath) : null;

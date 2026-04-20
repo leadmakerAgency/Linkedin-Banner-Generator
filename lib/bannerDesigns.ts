@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BannerFormValues, BannerGenerationInput, LayoutOverlayPayload } from "@/types/banner";
 import type { DesignSnapshotJson } from "@/types/designSnapshot";
@@ -60,6 +60,7 @@ export const toPersistedFormValues = (values: BannerGenerationInput): BannerForm
 };
 
 export const persistNewDesignAfterBackgroundPng = async (params: {
+  ownerUserId: string;
   values: BannerGenerationInput;
   promptSnapshot: string;
   layoutOverlay: LayoutOverlayPayload | null;
@@ -78,6 +79,7 @@ export const persistNewDesignAfterBackgroundPng = async (params: {
   };
 
   await insertDesignWithBackgroundVersion({
+    ownerUserId: params.ownerUserId,
     designId,
     title: buildDesignTitle(params.values.companyName),
     bannerType: params.values.bannerType,
@@ -91,6 +93,7 @@ export const persistNewDesignAfterBackgroundPng = async (params: {
 };
 
 export const insertDesignWithBackgroundVersion = async (input: {
+  ownerUserId: string;
   designId: string;
   title: string;
   bannerType: BannerFormValues["bannerType"];
@@ -103,6 +106,7 @@ export const insertDesignWithBackgroundVersion = async (input: {
 
   const { error: designError } = await supabase.from("banner_designs").insert({
     id: input.designId,
+    owner_user_id: input.ownerUserId,
     title: input.title,
     banner_type: input.bannerType,
     background_storage_path: input.backgroundStoragePath,
@@ -125,7 +129,27 @@ export const insertDesignWithBackgroundVersion = async (input: {
   }
 };
 
+const parseVersionNumber = (raw: unknown): number => {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string") {
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+};
+
+const isUniqueViolation = (message: string, code?: string): boolean => {
+  if (code === "23505") {
+    return true;
+  }
+  const lower = message.toLowerCase();
+  return lower.includes("duplicate key") && lower.includes("unique constraint");
+};
+
 export const appendOverlayVersion = async (input: {
+  ownerUserId: string;
   designId: string;
   snapshot: DesignSnapshotJson;
   previewPng: Buffer;
@@ -133,50 +157,78 @@ export const appendOverlayVersion = async (input: {
   secondaryLogoBuffer: Buffer | null;
 }): Promise<{ version: number; previewStoragePath: string }> => {
   const supabase = getClient();
-  const { data: maxRow, error: maxError } = await supabase
-    .from("banner_design_versions")
-    .select("version")
-    .eq("design_id", input.designId)
-    .order("version", { ascending: false })
-    .limit(1)
+  const { data: owned, error: ownedError } = await supabase
+    .from("banner_designs")
+    .select("id")
+    .eq("id", input.designId)
+    .eq("owner_user_id", input.ownerUserId)
     .maybeSingle();
 
-  if (maxError) {
-    throw new Error(maxError.message);
+  if (ownedError) {
+    throw new Error(ownedError.message);
+  }
+  if (!owned) {
+    throw new Error("Design not found.");
   }
 
-  const nextVersion = (maxRow?.version ?? 0) + 1;
-  const previewPath = `previews/${input.designId}/${newAssetFileName()}`;
-  await uploadBannerPng(previewPath, input.previewPng);
+  const maxAttempts = 12;
 
-  let primaryLogoStoragePath: string | null = null;
-  let secondaryLogoStoragePath: string | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const { data: maxRow, error: maxError } = await supabase
+      .from("banner_design_versions")
+      .select("version")
+      .eq("design_id", input.designId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (input.primaryLogoBuffer) {
-    primaryLogoStoragePath = `logos/${input.designId}/${randomUUID()}-primary.png`;
-    await uploadBannerPng(primaryLogoStoragePath, input.primaryLogoBuffer);
+    if (maxError) {
+      throw new Error(maxError.message);
+    }
+
+    const nextVersion = parseVersionNumber(maxRow?.version) + 1;
+    const previewPath = `previews/${input.designId}/${newAssetFileName()}`;
+    await uploadBannerPng(previewPath, input.previewPng);
+
+    let primaryLogoStoragePath: string | null = null;
+    let secondaryLogoStoragePath: string | null = null;
+
+    if (input.primaryLogoBuffer) {
+      primaryLogoStoragePath = `logos/${input.designId}/${randomUUID()}-primary.png`;
+      await uploadBannerPng(primaryLogoStoragePath, input.primaryLogoBuffer);
+    }
+    if (input.secondaryLogoBuffer) {
+      secondaryLogoStoragePath = `logos/${input.designId}/${randomUUID()}-secondary.png`;
+      await uploadBannerPng(secondaryLogoStoragePath, input.secondaryLogoBuffer);
+    }
+
+    const { error: versionError } = await supabase.from("banner_design_versions").insert({
+      design_id: input.designId,
+      version: nextVersion,
+      snapshot: input.snapshot,
+      preview_storage_path: previewPath,
+      primary_logo_storage_path: primaryLogoStoragePath,
+      secondary_logo_storage_path: secondaryLogoStoragePath
+    });
+
+    if (!versionError) {
+      return { version: nextVersion, previewStoragePath: previewPath };
+    }
+
+    const msg = versionError.message ?? "";
+    if (isUniqueViolation(msg, versionError.code) && attempt < maxAttempts - 1) {
+      continue;
+    }
+    throw new Error(msg || "Failed to save overlay version.");
   }
-  if (input.secondaryLogoBuffer) {
-    secondaryLogoStoragePath = `logos/${input.designId}/${randomUUID()}-secondary.png`;
-    await uploadBannerPng(secondaryLogoStoragePath, input.secondaryLogoBuffer);
-  }
 
-  const { error: versionError } = await supabase.from("banner_design_versions").insert({
-    design_id: input.designId,
-    version: nextVersion,
-    snapshot: input.snapshot,
-    preview_storage_path: previewPath,
-    primary_logo_storage_path: primaryLogoStoragePath,
-    secondary_logo_storage_path: secondaryLogoStoragePath
-  });
-  if (versionError) {
-    throw new Error(versionError.message);
-  }
-
-  return { version: nextVersion, previewStoragePath: previewPath };
+  throw new Error("Failed to allocate a new overlay version after repeated conflicts.");
 };
 
-export const listDesignsForHistory = async (limit: number): Promise<
+export const listDesignsForHistory = async (
+  limit: number,
+  ownerUserId: string
+): Promise<
   Array<{
     id: string;
     title: string;
@@ -190,6 +242,7 @@ export const listDesignsForHistory = async (limit: number): Promise<
   const { data: designs, error: designsError } = await supabase
     .from("banner_designs")
     .select("id, title, banner_type, updated_at")
+    .eq("owner_user_id", ownerUserId)
     .order("updated_at", { ascending: false })
     .limit(limit);
 
@@ -233,7 +286,8 @@ export const listDesignsForHistory = async (limit: number): Promise<
 };
 
 export const getDesignDetailForEdit = async (
-  designId: string
+  designId: string,
+  ownerUserId: string
 ): Promise<{
   designId: string;
   backgroundStoragePath: string;
@@ -246,6 +300,7 @@ export const getDesignDetailForEdit = async (
     .from("banner_designs")
     .select("id, background_storage_path")
     .eq("id", designId)
+    .eq("owner_user_id", ownerUserId)
     .maybeSingle();
 
   if (designError || !design) {
@@ -276,22 +331,4 @@ export const getDesignDetailForEdit = async (
     primaryLogoPath: version.primary_logo_storage_path,
     secondaryLogoPath: version.secondary_logo_storage_path
   };
-};
-
-export const designsApiSecretOk = (request: Request): boolean => {
-  const expected = process.env.DESIGNS_API_SECRET?.trim();
-  if (!expected) {
-    return process.env.NODE_ENV !== "production";
-  }
-  const provided = request.headers.get("x-designs-secret") ?? "";
-  try {
-    const a = Buffer.from(provided, "utf8");
-    const b = Buffer.from(expected, "utf8");
-    if (a.length !== b.length) {
-      return false;
-    }
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
 };

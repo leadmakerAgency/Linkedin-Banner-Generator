@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getMaxImportImageBytes, fetchRemoteImageSafely } from "@/lib/backgroundImport";
 import { normalizeBackgroundBuffer, parseBannerInput } from "@/lib/generateBanner";
 import { isBannerDesignPersistenceEnabled, persistNewDesignAfterBackgroundPng } from "@/lib/bannerDesigns";
+import { getPersistOwnerOrErrorResponse } from "@/lib/requirePersistAuth";
 import { saveOutputPng } from "@/lib/storage";
 import { appendCacheBustParam } from "@/lib/stripCacheBust";
 import { getBannerDimensions, type BannerType } from "@/types/banner";
@@ -69,12 +70,17 @@ export const POST = async (request: Request) => {
     const normalizedPng = await normalizeBackgroundBuffer(sourceBuffer, secondaryBrandColor, width, height);
 
     if (isBannerDesignPersistenceEnabled()) {
+      const owner = await getPersistOwnerOrErrorResponse();
+      if (!owner.ok) {
+        return owner.response;
+      }
       const { values, promptSnapshot } = parseBannerInput(formData);
       if (values.bannerType !== bannerTypeRaw) {
         return NextResponse.json({ error: "bannerType mismatch between form and import." }, { status: 400 });
       }
 
       const { designId, backgroundStoragePath, backgroundSignedUrl } = await persistNewDesignAfterBackgroundPng({
+        ownerUserId: owner.userId,
         values,
         promptSnapshot,
         layoutOverlay: null,

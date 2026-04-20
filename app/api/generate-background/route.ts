@@ -5,6 +5,7 @@ import {
   runBackgroundOnlyGeneration
 } from "@/lib/generateBanner";
 import { isBannerDesignPersistenceEnabled, persistNewDesignAfterBackgroundPng } from "@/lib/bannerDesigns";
+import { getPersistOwnerOrErrorResponse } from "@/lib/requirePersistAuth";
 import { appendCacheBustParam } from "@/lib/stripCacheBust";
 
 export const runtime = "nodejs";
@@ -15,8 +16,13 @@ export const POST = async (request: Request) => {
     const { values, primaryLogo, secondaryLogo, promptSnapshot } = parseBannerInput(formData);
 
     if (isBannerDesignPersistenceEnabled()) {
+      const owner = await getPersistOwnerOrErrorResponse();
+      if (!owner.ok) {
+        return owner.response;
+      }
       const basePngBuffer = await buildBackgroundOnlyPngBuffer(values, primaryLogo, secondaryLogo);
       const { designId, backgroundStoragePath, backgroundSignedUrl } = await persistNewDesignAfterBackgroundPng({
+        ownerUserId: owner.userId,
         values,
         promptSnapshot,
         layoutOverlay: null,

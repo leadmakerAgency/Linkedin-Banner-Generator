@@ -1,10 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { BannerFiles } from "@/components/BannerForm";
 import type { BannerFormValues, LayoutOverlayPayload } from "@/types/banner";
-
-const STORAGE_KEY = "banner_designs_api_secret";
 
 export type DesignHistoryListItem = {
   id: string;
@@ -36,42 +35,38 @@ const urlToPngFile = async (url: string, filename: string): Promise<File> => {
 };
 
 export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) => {
-  const [secretInput, setSecretInput] = useState("");
-  const [secret, setSecret] = useState("");
   const [designs, setDesigns] = useState<DesignHistoryListItem[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = typeof window !== "undefined" ? window.sessionStorage.getItem(STORAGE_KEY) : null;
-    if (stored) {
-      setSecret(stored);
-      setSecretInput(stored);
-    }
-  }, []);
-
-  const handleSaveSecret = useCallback(() => {
-    const next = secretInput.trim();
-    setSecret(next);
-    if (typeof window !== "undefined") {
-      window.sessionStorage.setItem(STORAGE_KEY, next);
-    }
-  }, [secretInput]);
+  const [historyStatus, setHistoryStatus] = useState<"idle" | "signed_out" | "unavailable">("idle");
 
   const handleFetchList = useCallback(async () => {
     setListError(null);
     setIsLoadingList(true);
     try {
-      const response = await fetch("/api/designs", {
-        headers: { "x-designs-secret": secret }
-      });
+      const response = await fetch("/api/designs", { credentials: "include" });
       const data = (await response.json()) as { designs?: DesignHistoryListItem[]; error?: string };
+
+      if (response.status === 401) {
+        setHistoryStatus("signed_out");
+        setDesigns([]);
+        setListError(null);
+        return;
+      }
+      if (response.status === 503) {
+        setHistoryStatus("unavailable");
+        setListError(data.error ?? "Design history is not available.");
+        setDesigns([]);
+        return;
+      }
       if (!response.ok) {
         setListError(data.error ?? "Failed to load history.");
         setDesigns([]);
         return;
       }
+
+      setHistoryStatus("idle");
       setDesigns(data.designs ?? []);
     } catch {
       setListError("Unable to reach history API.");
@@ -79,15 +74,17 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
     } finally {
       setIsLoadingList(false);
     }
-  }, [secret]);
+  }, []);
+
+  useEffect(() => {
+    void handleFetchList();
+  }, [handleFetchList]);
 
   const handleEditDesign = useCallback(
     async (designId: string) => {
       setEditError(null);
       try {
-        const response = await fetch(`/api/designs/${designId}`, {
-          headers: { "x-designs-secret": secret }
-        });
+        const response = await fetch(`/api/designs/${designId}`, { credentials: "include" });
         const data = (await response.json()) as {
           designId?: string;
           backgroundStoragePath?: string;
@@ -97,6 +94,11 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
           secondaryLogoSignedUrl?: string | null;
           error?: string;
         };
+
+        if (response.status === 401) {
+          setEditError("Sign in to load a saved design.");
+          return;
+        }
 
         if (!response.ok || !data.snapshot || !data.backgroundSignedUrl) {
           setEditError(data.error ?? "Failed to load design.");
@@ -125,46 +127,38 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
         setEditError("Unable to load design for editing.");
       }
     },
-    [onLoadDesign, secret]
+    [onLoadDesign]
   );
 
   return (
     <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-      <h4 className="text-sm font-semibold tracking-tight text-slate-200">Design history</h4>
-      <p className="mt-1 text-xs text-slate-400">
-        Saved designs use Supabase. Enter the same value as <code className="text-slate-300">DESIGNS_API_SECRET</code> on
-        the server; it is kept in session storage for this browser only.
-      </p>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-[200px] flex-1">
-          <label htmlFor="designs-secret" className="mb-1 block text-xs font-medium text-slate-300">
-            History secret
-          </label>
-          <input
-            id="designs-secret"
-            type="password"
-            autoComplete="off"
-            value={secretInput}
-            onChange={(event) => setSecretInput(event.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-200 outline-none ring-blue-500/40 focus:ring-2"
-          />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold tracking-tight text-slate-200">Design history</h4>
+          <p className="mt-1 text-xs text-slate-400">
+            When Supabase is configured, your saved banners appear here after you sign in. No shared secret is
+            required.
+          </p>
         </div>
         <button
           type="button"
-          onClick={handleSaveSecret}
-          className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
-        >
-          Save secret
-        </button>
-        <button
-          type="button"
           onClick={() => void handleFetchList()}
-          disabled={isLoadingList || secret.trim().length === 0}
-          className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+          disabled={isLoadingList}
+          className="shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoadingList ? "Loading…" : "Refresh list"}
+          {isLoadingList ? "Loading…" : "Refresh"}
         </button>
       </div>
+
+      {historyStatus === "signed_out" ? (
+        <p className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-200" aria-live="polite">
+          <Link href="/login" className="font-semibold text-blue-400 hover:text-blue-300">
+            Sign in
+          </Link>{" "}
+          to see your saved designs. Magic link email is sent from Supabase Auth.
+        </p>
+      ) : null}
+
       {listError ? (
         <p className="mt-2 text-xs font-medium text-rose-200" aria-live="polite">
           {listError}
@@ -175,6 +169,7 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
           {editError}
         </p>
       ) : null}
+
       {designs.length > 0 ? (
         <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto text-xs">
           {designs.map((row) => (
@@ -198,9 +193,9 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="mt-3 text-xs text-slate-500">No saved designs yet, or list not loaded.</p>
-      )}
+      ) : historyStatus !== "signed_out" && historyStatus !== "unavailable" && !isLoadingList && !listError ? (
+        <p className="mt-3 text-xs text-slate-500">No saved designs yet.</p>
+      ) : null}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+/** Server-only. If this key is ever exposed, rotate it in Supabase immediately; never ship to the client. */
 export const isSupabaseServiceConfigured = (): boolean => {
   return Boolean(process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
 };
