@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { BannerFiles, BannerForm } from "@/components/BannerForm";
 import { BannerPreview } from "@/components/BannerPreview";
+import { DesignHistoryPanel } from "@/components/DesignHistoryPanel";
 import { nudgeLayoutOverlay, nudgeLayoutOverlayResize, type LayoutDragGroup } from "@/lib/nudgeLayoutOverlay";
 import type { LayoutOverlayPayload } from "@/types/banner";
 import { STYLE_PRESETS } from "@/lib/stylePresets";
@@ -11,9 +12,13 @@ import { getStylePromptSentence } from "@/lib/stylePresetPromptVersions";
 import {
   BannerFormValues,
   BannerType,
+  DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE,
   DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE,
+  PHONE_ICON_SIZE_LIMITS,
+  PHONE_NUMBER_FONT_SIZE_LIMITS,
   getBannerDimensions
 } from "@/types/banner";
+import { stripCacheBustParam } from "@/lib/stripCacheBust";
 
 const INITIAL_VALUES: BannerFormValues = {
   bannerType: "personal",
@@ -33,6 +38,9 @@ const INITIAL_VALUES: BannerFormValues = {
   primaryBrandColor: "#1D4ED8",
   secondaryBrandColor: "#0F172A",
   phoneNumber: "",
+  phoneNumberFontSizePx: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.phoneNumberFontSizePx,
+  phoneIconSizePx: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.phoneIconSizePx,
+  showPhoneIcon: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.showPhoneIcon,
   phoneIconOffsetX: 0,
   phoneIconOffsetY: 0,
   layoutPrimaryLogoDeltaX: 0,
@@ -55,10 +63,6 @@ const INITIAL_FILES: BannerFiles = {
   secondaryLogo: null
 };
 
-const stripQuery = (url: string): string => {
-  return url.split("?")[0] ?? url;
-};
-
 const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
   ...base,
   phoneIconOffsetX: 0,
@@ -77,9 +81,15 @@ const withDefaultLayout = (base: BannerFormValues): BannerFormValues => ({
 
 const clampLayoutDelta = (value: number): number => Math.max(-2000, Math.min(2000, value));
 const clampLogoScalePct = (value: number): number => Math.max(25, Math.min(400, value));
+const clampPhoneNumberFontSizePx = (value: number): number =>
+  Math.max(PHONE_NUMBER_FONT_SIZE_LIMITS.min, Math.min(PHONE_NUMBER_FONT_SIZE_LIMITS.max, value));
+const clampPhoneIconSizePx = (value: number): number =>
+  Math.max(PHONE_ICON_SIZE_LIMITS.min, Math.min(PHONE_ICON_SIZE_LIMITS.max, value));
 
 const withClampedLayout = (base: BannerFormValues): BannerFormValues => ({
   ...base,
+  phoneNumberFontSizePx: clampPhoneNumberFontSizePx(base.phoneNumberFontSizePx),
+  phoneIconSizePx: clampPhoneIconSizePx(base.phoneIconSizePx),
   layoutPrimaryLogoDeltaX: clampLayoutDelta(base.layoutPrimaryLogoDeltaX),
   layoutPrimaryLogoDeltaY: clampLayoutDelta(base.layoutPrimaryLogoDeltaY),
   layoutPrimaryLogoScalePct: clampLogoScalePct(base.layoutPrimaryLogoScalePct),
@@ -97,6 +107,9 @@ const HomePage = () => {
   const [files, setFiles] = useState<BannerFiles>(INITIAL_FILES);
   const [promptSnapshot, setPromptSnapshot] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  /** Supabase object path `backgrounds/{designId}/...` when using persisted designs; null in legacy-only mode. */
+  const [backgroundStoragePath, setBackgroundStoragePath] = useState<string | null>(null);
+  const [activeDesignId, setActiveDesignId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [importUrl, setImportUrl] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -140,6 +153,8 @@ const HomePage = () => {
     `Primary brand color: ${values.primaryBrandColor}.`,
     `Secondary brand color: ${values.secondaryBrandColor}.`,
     `Phone number: ${values.phoneNumber.trim() || "(not provided)"}.`,
+    `Phone number font size: ${values.phoneNumberFontSizePx}px.`,
+    values.showPhoneIcon ? `Phone icon size: ${values.phoneIconSizePx}px.` : "Phone icon: hidden.",
     `Phone icon-only offset X: ${values.phoneIconOffsetX}px (positive = right, clamped so the icon stays left of the digits), Y: ${values.phoneIconOffsetY}px (positive = down); phone number position unchanged.`,
     `Style preset (${STYLE_PRESETS[values.stylePreset].label}): ${getStylePromptSentence(values.stylePreset, values.stylePromptVariantIndex)}`,
     `Image model: ${values.imageModel}.`,
@@ -147,7 +162,12 @@ const HomePage = () => {
   ].join(" ");
 
   const handleBuildFormData = useCallback(
-    (forceFresh?: boolean, sourceValues?: BannerFormValues): FormData => {
+    (
+      forceFresh?: boolean,
+      sourceValues?: BannerFormValues,
+      options?: { includeDesignSession?: boolean }
+    ): FormData => {
+      const includeDesignSession = options?.includeDesignSession !== false;
       const v = withClampedLayout(sourceValues ?? values);
       const companyName = v.companyName.trim();
       const companyDescription = v.companyDescription.trim();
@@ -171,9 +191,11 @@ const HomePage = () => {
       formData.set("primaryBrandColor", v.primaryBrandColor);
       formData.set("secondaryBrandColor", v.secondaryBrandColor);
       formData.set("phoneNumber", phoneNumber);
-      // Keep phone row perfectly horizontal and stable as one group.
-      formData.set("phoneIconOffsetX", "0");
-      formData.set("phoneIconOffsetY", "0");
+      formData.set("phoneNumberFontSizePx", String(v.phoneNumberFontSizePx));
+      formData.set("phoneIconSizePx", String(v.phoneIconSizePx));
+      formData.set("showPhoneIcon", String(v.showPhoneIcon));
+      formData.set("phoneIconOffsetX", String(v.phoneIconOffsetX));
+      formData.set("phoneIconOffsetY", String(v.phoneIconOffsetY));
       formData.set("layoutPrimaryLogoDeltaX", String(v.layoutPrimaryLogoDeltaX));
       formData.set("layoutPrimaryLogoDeltaY", String(v.layoutPrimaryLogoDeltaY));
       formData.set("layoutPrimaryLogoScalePct", String(v.layoutPrimaryLogoScalePct));
@@ -197,10 +219,14 @@ const HomePage = () => {
       if (forceFresh) {
         formData.set("regenerateNonce", generateNonce());
       }
+      if (includeDesignSession && activeDesignId && backgroundStoragePath) {
+        formData.set("designId", activeDesignId);
+        formData.set("backgroundStoragePath", backgroundStoragePath);
+      }
 
       return formData;
     },
-    [values, files, generatedPrompt]
+    [values, files, generatedPrompt, activeDesignId, backgroundStoragePath]
   );
 
   const handleBackgroundRequest = async (
@@ -226,15 +252,23 @@ const HomePage = () => {
         method: "POST",
         body: handleBuildFormData(forceFresh, sourceValues)
       });
-      const data = (await response.json()) as { backgroundUrl?: string; imageUrl?: string; error?: string };
+      const data = (await response.json()) as {
+        backgroundUrl?: string;
+        imageUrl?: string;
+        error?: string;
+        designId?: string;
+        backgroundStoragePath?: string;
+      };
 
       if (!response.ok || (!data.backgroundUrl && !data.imageUrl)) {
         setErrorMessage(data.error ?? "Background generation failed.");
         return;
       }
 
-      const nextBackground = stripQuery(data.backgroundUrl ?? data.imageUrl ?? "");
+      const nextBackground = stripCacheBustParam(data.backgroundUrl ?? data.imageUrl ?? "");
       setBackgroundUrl(nextBackground);
+      setBackgroundStoragePath(data.backgroundStoragePath ?? null);
+      setActiveDesignId(data.designId ?? null);
       setPreviewUrl(null);
       setLayoutOverlay(null);
       setIsLoadingOverlay(true);
@@ -263,15 +297,26 @@ const HomePage = () => {
     void handleBackgroundRequest("/api/generate-background", true, resetValues);
   };
 
-  const handleApplyImportedBackground = useCallback((nextBackgroundUrl: string) => {
-    setValues((previous) => withDefaultLayout(previous));
-    setLayoutOverlay(null);
-    setPreviewUrl(null);
-    setBackgroundUrl(stripQuery(nextBackgroundUrl));
-    setIsLoadingOverlay(true);
-    setErrorMessage(null);
-    setImportError(null);
-  }, []);
+  const handleApplyImportedBackground = useCallback(
+    (
+      nextBackgroundUrl: string,
+      meta?: {
+        designId?: string;
+        backgroundStoragePath?: string;
+      }
+    ) => {
+      setValues((previous) => withDefaultLayout(previous));
+      setLayoutOverlay(null);
+      setPreviewUrl(null);
+      setBackgroundUrl(stripCacheBustParam(nextBackgroundUrl));
+      setBackgroundStoragePath(meta?.backgroundStoragePath ?? null);
+      setActiveDesignId(meta?.designId ?? null);
+      setIsLoadingOverlay(true);
+      setErrorMessage(null);
+      setImportError(null);
+    },
+    []
+  );
 
   const handleImportBackgroundFile = async () => {
     if (!importFile) {
@@ -282,20 +327,26 @@ const HomePage = () => {
     setIsImportingBackground(true);
     setImportError(null);
     try {
-      const formData = new FormData();
+      const formData = handleBuildFormData(undefined, undefined, { includeDesignSession: false });
       formData.set("file", importFile);
-      formData.set("bannerType", values.bannerType);
-      formData.set("secondaryBrandColor", values.secondaryBrandColor);
       const response = await fetch("/api/import-background", {
         method: "POST",
         body: formData
       });
-      const data = (await response.json()) as { backgroundUrl?: string; error?: string };
+      const data = (await response.json()) as {
+        backgroundUrl?: string;
+        error?: string;
+        designId?: string;
+        backgroundStoragePath?: string;
+      };
       if (!response.ok || !data.backgroundUrl) {
         setImportError(data.error ?? "Failed to import background file.");
         return;
       }
-      handleApplyImportedBackground(data.backgroundUrl);
+      handleApplyImportedBackground(data.backgroundUrl, {
+        designId: data.designId,
+        backgroundStoragePath: data.backgroundStoragePath
+      });
       setImportFile(null);
       if (importFileInputRef.current) {
         importFileInputRef.current.value = "";
@@ -317,20 +368,26 @@ const HomePage = () => {
     setIsImportingBackground(true);
     setImportError(null);
     try {
-      const formData = new FormData();
+      const formData = handleBuildFormData(undefined, undefined, { includeDesignSession: false });
       formData.set("imageUrl", trimmedUrl);
-      formData.set("bannerType", values.bannerType);
-      formData.set("secondaryBrandColor", values.secondaryBrandColor);
       const response = await fetch("/api/import-background", {
         method: "POST",
         body: formData
       });
-      const data = (await response.json()) as { backgroundUrl?: string; error?: string };
+      const data = (await response.json()) as {
+        backgroundUrl?: string;
+        error?: string;
+        designId?: string;
+        backgroundStoragePath?: string;
+      };
       if (!response.ok || !data.backgroundUrl) {
         setImportError(data.error ?? "Failed to import background URL.");
         return;
       }
-      handleApplyImportedBackground(data.backgroundUrl);
+      handleApplyImportedBackground(data.backgroundUrl, {
+        designId: data.designId,
+        backgroundStoragePath: data.backgroundStoragePath
+      });
     } catch {
       setImportError("Unable to import URL image. Please try again.");
     } finally {
@@ -379,6 +436,30 @@ const HomePage = () => {
     []
   );
 
+  const handleLoadDesignFromHistory = useCallback(
+    (payload: {
+      values: BannerFormValues;
+      promptSnapshot: string;
+      layoutOverlay: LayoutOverlayPayload | null;
+      backgroundDisplayUrl: string;
+      backgroundStoragePath: string | null;
+      designId: string | null;
+      files: BannerFiles;
+    }) => {
+      setValues(withClampedLayout(payload.values));
+      setPromptSnapshot(payload.promptSnapshot);
+      setFiles(payload.files);
+      setBackgroundUrl(payload.backgroundDisplayUrl);
+      setBackgroundStoragePath(payload.backgroundStoragePath);
+      setActiveDesignId(payload.designId);
+      setPreviewUrl(null);
+      setLayoutOverlay(payload.layoutOverlay);
+      setErrorMessage(null);
+      setImportError(null);
+    },
+    []
+  );
+
   useEffect(() => {
     setPromptSnapshot(generatedPrompt);
   }, [generatedPrompt]);
@@ -411,12 +492,15 @@ const HomePage = () => {
     }
     previousBannerType.current = values.bannerType;
     setBackgroundUrl(null);
+    setBackgroundStoragePath(null);
+    setActiveDesignId(null);
     setPreviewUrl(null);
     setLayoutOverlay(null);
     setErrorMessage(null);
     setValues((previous) => ({
       ...previous,
       ...DEFAULT_TYPOGRAPHY_FOR_BANNER_TYPE[values.bannerType],
+      ...DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE[values.bannerType],
       layoutPrimaryLogoDeltaX: 0,
       layoutPrimaryLogoDeltaY: 0,
       layoutPrimaryLogoScalePct: 100,
@@ -443,7 +527,7 @@ const HomePage = () => {
       setErrorMessage(null);
 
       const formData = handleBuildFormData();
-      formData.set("backgroundUrl", stripQuery(backgroundUrl));
+      formData.set("backgroundUrl", stripCacheBustParam(backgroundUrl));
 
       void (async () => {
         try {
@@ -455,6 +539,7 @@ const HomePage = () => {
             imageUrl?: string;
             error?: string;
             layoutOverlay?: LayoutOverlayPayload;
+            designId?: string;
           };
 
           if (overlayRequestId.current !== requestId) {
@@ -467,6 +552,9 @@ const HomePage = () => {
           }
           setPreviewUrl(data.imageUrl);
           setLayoutOverlay(data.layoutOverlay ?? null);
+          if (data.designId) {
+            setActiveDesignId(data.designId);
+          }
         } catch {
           if (overlayRequestId.current === requestId) {
             setErrorMessage("Unable to render overlay. Please retry.");
@@ -480,7 +568,7 @@ const HomePage = () => {
     }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [backgroundUrl, values, files, handleBuildFormData]);
+  }, [backgroundUrl, backgroundStoragePath, values, files, handleBuildFormData]);
 
   const displayUrl = previewUrl ?? backgroundUrl;
   const hasBackground = Boolean(backgroundUrl);
@@ -493,7 +581,7 @@ const HomePage = () => {
             <Image src="/leadmaker-logo.png" alt="LeadMaker" width={44} height={44} priority />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">LinkedIn Banner Generator</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-100 md:text-3xl">LeadMaker LinkedIn Banner Generator</h1>
             <p className="mt-2 text-sm text-slate-300 md:text-base">
               Build high-quality LinkedIn banners with guided settings, AI assistance, and deterministic brand overlays.
             </p>
@@ -525,7 +613,8 @@ const HomePage = () => {
                 </button>
               </div>
               <p className="mb-2 text-xs text-slate-400">
-                Prompt updates automatically from your form values and is persisted locally with layout positions.
+                Prompt updates automatically from your form values. When Supabase is configured, designs are saved to
+                history after backgrounds and overlays.
               </p>
               <textarea
                 readOnly
@@ -589,6 +678,8 @@ const HomePage = () => {
                   </p>
                 ) : null}
               </div>
+
+              <DesignHistoryPanel onLoadDesign={handleLoadDesignFromHistory} />
             </div>
           </div>
         </section>

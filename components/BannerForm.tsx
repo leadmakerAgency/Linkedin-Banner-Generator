@@ -9,6 +9,8 @@ import {
   StylePresetId,
   FontStyleId,
   FONT_SIZE_LIMITS,
+  PHONE_ICON_SIZE_LIMITS,
+  PHONE_NUMBER_FONT_SIZE_LIMITS,
   getBannerDimensions
 } from "@/types/banner";
 
@@ -197,7 +199,7 @@ export const BannerForm = ({
 }: BannerFormProps) => {
   const FONT_SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog.";
 
-  const handleInputChange = (field: keyof BannerFormValues, value: string | number) => {
+  const handleInputChange = (field: keyof BannerFormValues, value: string | number | boolean) => {
     if (field === "stylePreset") {
       const nextPreset = value as StylePresetId;
       if (nextPreset !== values.stylePreset) {
@@ -470,6 +472,49 @@ export const BannerForm = ({
             onChange={(event) => handleInputChange("phoneNumber", event.target.value)}
             placeholder="+1 555 010 234"
           />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Phone number font size (px)
+          <input
+            type="number"
+            min={PHONE_NUMBER_FONT_SIZE_LIMITS.min}
+            max={PHONE_NUMBER_FONT_SIZE_LIMITS.max}
+            step={1}
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+            value={values.phoneNumberFontSizePx}
+            onChange={(event) => handleInputChange("phoneNumberFontSizePx", Number(event.target.value))}
+          />
+          <span className="text-xs font-normal text-slate-500">
+            Controls only the phone digits size on the banner.
+          </span>
+        </label>
+
+        <label className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm font-medium text-slate-300 md:col-span-2">
+          <input
+            type="checkbox"
+            checked={values.showPhoneIcon}
+            onChange={(event) => handleInputChange("showPhoneIcon", event.target.checked)}
+          />
+          Show phone icon
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+          Phone icon size (px)
+          <input
+            type="number"
+            min={PHONE_ICON_SIZE_LIMITS.min}
+            max={PHONE_ICON_SIZE_LIMITS.max}
+            step={1}
+            className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm font-normal text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+            value={values.phoneIconSizePx}
+            onChange={(event) => handleInputChange("phoneIconSizePx", Number(event.target.value))}
+            disabled={!values.showPhoneIcon}
+            aria-describedby="phone-icon-size-hint"
+          />
+          <span id="phone-icon-size-hint" className="text-xs font-normal text-slate-500">
+            Set exact icon size in px. Disabled when icon is hidden.
+          </span>
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">

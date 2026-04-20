@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { z } from "zod";
-import { FONT_SIZE_LIMITS } from "@/types/banner";
+import { FONT_SIZE_LIMITS, PHONE_ICON_SIZE_LIMITS, PHONE_NUMBER_FONT_SIZE_LIMITS } from "@/types/banner";
 
 export const runtime = "nodejs";
 
@@ -67,6 +67,9 @@ const settingsSchema = z
     primaryBrandColor: z.string(),
     secondaryBrandColor: z.string(),
     phoneNumber: z.string(),
+    phoneNumberFontSizePx: z.number().int().min(PHONE_NUMBER_FONT_SIZE_LIMITS.min).max(PHONE_NUMBER_FONT_SIZE_LIMITS.max),
+    phoneIconSizePx: z.number().int().min(PHONE_ICON_SIZE_LIMITS.min).max(PHONE_ICON_SIZE_LIMITS.max),
+    showPhoneIcon: z.boolean(),
     phoneIconOffsetX: z.number().int().min(-400).max(400),
     phoneIconOffsetY: z.number().int().min(-200).max(200),
     imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
@@ -112,6 +115,14 @@ const patchSchema = z.object({
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   phoneNumber: z.string().max(40).optional(),
+  phoneNumberFontSizePx: z
+    .number()
+    .int()
+    .min(PHONE_NUMBER_FONT_SIZE_LIMITS.min)
+    .max(PHONE_NUMBER_FONT_SIZE_LIMITS.max)
+    .optional(),
+  phoneIconSizePx: z.number().int().min(PHONE_ICON_SIZE_LIMITS.min).max(PHONE_ICON_SIZE_LIMITS.max).optional(),
+  showPhoneIcon: z.boolean().optional(),
   phoneIconOffsetX: z.number().int().min(-400).max(400).optional(),
   phoneIconOffsetY: z.number().int().min(-200).max(200).optional(),
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]).optional(),
@@ -178,7 +189,7 @@ export const POST = async (request: Request) => {
             {
               role: "system",
               content:
-                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameFontSize, companyDescriptionFontSize, companyNameFontWeight, companyDescriptionFontWeight, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, phoneIconOffsetX, phoneIconOffsetY, imageModel, stylePreset."
+                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameFontSize, companyDescriptionFontSize, companyNameFontWeight, companyDescriptionFontWeight, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, phoneNumberFontSizePx, phoneIconSizePx, showPhoneIcon, phoneIconOffsetX, phoneIconOffsetY, imageModel, stylePreset."
             },
             {
               role: "user",

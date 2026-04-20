@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMaxImportImageBytes, fetchRemoteImageSafely } from "@/lib/backgroundImport";
-import { normalizeBackgroundBuffer } from "@/lib/generateBanner";
+import { normalizeBackgroundBuffer, parseBannerInput } from "@/lib/generateBanner";
+import { isBannerDesignPersistenceEnabled, persistNewDesignAfterBackgroundPng } from "@/lib/bannerDesigns";
 import { saveOutputPng } from "@/lib/storage";
 import { getBannerDimensions, type BannerType } from "@/types/banner";
 
@@ -65,6 +66,29 @@ export const POST = async (request: Request) => {
 
     const { width, height } = getBannerDimensions(bannerTypeRaw);
     const normalizedPng = await normalizeBackgroundBuffer(sourceBuffer, secondaryBrandColor, width, height);
+
+    if (isBannerDesignPersistenceEnabled()) {
+      const { values, promptSnapshot } = parseBannerInput(formData);
+      if (values.bannerType !== bannerTypeRaw) {
+        return NextResponse.json({ error: "bannerType mismatch between form and import." }, { status: 400 });
+      }
+
+      const { designId, backgroundStoragePath, backgroundSignedUrl } = await persistNewDesignAfterBackgroundPng({
+        values,
+        promptSnapshot,
+        layoutOverlay: null,
+        backgroundPng: normalizedPng,
+        source: "import"
+      });
+
+      return NextResponse.json({
+        backgroundUrl: `${backgroundSignedUrl}?t=${Date.now()}`,
+        filename: backgroundStoragePath.split("/").pop() ?? "background.png",
+        designId,
+        backgroundStoragePath
+      });
+    }
+
     const stored = await saveOutputPng(normalizedPng);
 
     return NextResponse.json({

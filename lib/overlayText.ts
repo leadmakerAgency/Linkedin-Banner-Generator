@@ -23,6 +23,8 @@ export const renderTextRaster = async (options: {
   colorHex: string;
   maxWidth: number;
   align: "left" | "right" | "centre";
+  /** Defaults to word wrap. Use "none" for single-line labels (e.g. phone) where spaces must not break lines. */
+  textWrap?: "word" | "none";
 }): Promise<TextRasterResult | null> => {
   const trimmed = options.text.trim();
   if (!trimmed) {
@@ -36,6 +38,8 @@ export const renderTextRaster = async (options: {
   const align = options.align === "centre" ? "center" : options.align;
   const dpi = Math.round(Math.min(600, Math.max(96, options.fontSizePx * 5.5)));
 
+  const textWrap = options.textWrap ?? "word";
+
   const raw = await sharp({
     text: {
       text: markup,
@@ -45,7 +49,7 @@ export const renderTextRaster = async (options: {
       dpi,
       rgba: true,
       align,
-      wrap: "word"
+      ...(textWrap === "word" ? { wrap: "word" as const } : { wrap: "none" as const })
     }
   })
     .png()

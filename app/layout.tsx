@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LinkedIn Banner Generator",
+  title: "LeadMaker LinkedIn Banner Generator",
   description: "Form-based LinkedIn banner generator with deterministic safe zones.",
   icons: {
     icon: "/leadmaker-logo.png",

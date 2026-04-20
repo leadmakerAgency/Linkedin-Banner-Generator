@@ -4,7 +4,9 @@ import { getBannerLayoutConstants } from "@/lib/bannerLayoutConstants";
 import { renderTextRaster } from "@/lib/overlayText";
 import { generateCreativeBaseImage } from "@/lib/openai";
 import { buildStructuredPrompt } from "@/lib/promptBuilder";
+import { measureSquareSvgVerticalVisualBiasPx } from "@/lib/measureSvgAlphaVisualBias";
 import { computePhoneRowLayout } from "@/lib/phoneRowLayout";
+import { isBannerAssetStoragePath } from "@/lib/bannerAssetPath";
 import { getRevisionPatch } from "@/lib/revision";
 import { saveOutputPng } from "@/lib/storage";
 import {
@@ -15,6 +17,8 @@ import {
   getBannerDimensions,
   LayoutElementRect,
   LayoutOverlayPayload,
+  PHONE_ICON_SIZE_LIMITS,
+  PHONE_NUMBER_FONT_SIZE_LIMITS,
   RevisionAction,
   StylePresetId
 } from "@/types/banner";
@@ -28,6 +32,28 @@ const logoScaleField = z.preprocess(
   (val) => (typeof val === "string" && val.trim() === "" ? 100 : val),
   z.coerce.number().int().min(25).max(400)
 );
+const phoneNumberFontSizeField = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? 22 : val),
+  z.coerce.number().int().min(PHONE_NUMBER_FONT_SIZE_LIMITS.min).max(PHONE_NUMBER_FONT_SIZE_LIMITS.max)
+);
+const phoneIconSizeField = z.preprocess(
+  (val) => (typeof val === "string" && val.trim() === "" ? 30 : val),
+  z.coerce.number().int().min(PHONE_ICON_SIZE_LIMITS.min).max(PHONE_ICON_SIZE_LIMITS.max)
+);
+const showPhoneIconField = z.preprocess((val) => {
+  if (typeof val === "string") {
+    if (val === "true" || val === "1") {
+      return true;
+    }
+    if (val === "false" || val === "0") {
+      return false;
+    }
+    if (val.trim() === "") {
+      return true;
+    }
+  }
+  return val;
+}, z.coerce.boolean());
 
 const generationSchema = z
   .object({
@@ -90,6 +116,9 @@ const generationSchema = z
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   phoneNumber: z.string().trim().max(40),
+  phoneNumberFontSizePx: phoneNumberFontSizeField,
+  phoneIconSizePx: phoneIconSizeField,
+  showPhoneIcon: showPhoneIconField,
   phoneIconOffsetX: z.coerce.number().int().min(-400).max(400),
   phoneIconOffsetY: z.coerce.number().int().min(-200).max(200),
   layoutPrimaryLogoDeltaX: layoutDeltaField,
@@ -502,14 +531,19 @@ export const overlayBrandElements = async (
           height: Math.round(companyNameFontSize + companyDescriptionFontSize * 2.8)
         } satisfies LayoutElementRect);
 
-  const phoneFontSize = Math.max(11, Math.round((22 * bh) / refH));
-  const iconSize = Math.max(16, Math.round((30 * bh) / refH));
+  const phoneFontSize = Math.max(
+    PHONE_NUMBER_FONT_SIZE_LIMITS.min,
+    Math.min(PHONE_NUMBER_FONT_SIZE_LIMITS.max, values.phoneNumberFontSizePx)
+  );
+  const iconSize = Math.max(PHONE_ICON_SIZE_LIMITS.min, Math.min(PHONE_ICON_SIZE_LIMITS.max, values.phoneIconSizePx));
+  const shouldRenderPhoneIcon = values.showPhoneIcon;
   const iconGap = Math.max(4, Math.round((8 * bw) / refW));
   const phoneRightPad = Math.round((18 * bw) / refW);
   const phoneRowPad = Math.round((22 * bh) / refH);
   const phoneRightX = bw - phoneRightPad + values.layoutPhoneGroupDeltaX;
   const phoneRowCenterY = bh - phoneRowPad + values.layoutPhoneGroupDeltaY;
-  const phoneRasterMaxW = Math.min(bw, Math.round((480 * bw) / refW));
+  const phoneLayoutEdgeInset = 2;
+  const phoneTextRasterWidth = Math.max(1, bw - phoneLayoutEdgeInset * 2);
 
   let phoneGroupRect: LayoutElementRect | null = null;
 
@@ -520,21 +554,35 @@ export const overlayBrandElements = async (
       fontWeight: "500",
       fontSizePx: phoneFontSize,
       colorHex: phoneTextColor,
-      maxWidth: phoneRasterMaxW,
-      align: "right"
+      maxWidth: phoneTextRasterWidth,
+      align: "right",
+      textWrap: "none"
     });
 
-    const edge = 2;
+    const phoneIconSvg = shouldRenderPhoneIcon
+      ? `
+    <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
+    </svg>
+  `
+      : "";
+
+    const iconVisualBiasY = shouldRenderPhoneIcon
+      ? await measureSquareSvgVerticalVisualBiasPx(phoneIconSvg, iconSize)
+      : 0;
+
+    const edge = phoneLayoutEdgeInset;
     const row = computePhoneRowLayout({
       bannerWidth: bw,
       bannerHeight: bh,
       phoneRightX,
       phoneRowCenterY,
       phoneText: phoneRaster ? { width: phoneRaster.width, height: phoneRaster.height } : null,
-      iconSize,
-      gapBetweenIconAndText: iconGap,
+      iconSize: shouldRenderPhoneIcon ? iconSize : 0,
+      gapBetweenIconAndText: shouldRenderPhoneIcon ? iconGap : 0,
       phoneIconOffsetX: values.phoneIconOffsetX,
       phoneIconOffsetY: values.phoneIconOffsetY,
+      iconVisualBiasY,
       edgeInset: edge
     });
 
@@ -542,17 +590,19 @@ export const overlayBrandElements = async (
       overlays.push({ input: phoneRaster.buffer, left: row.phoneLeft, top: row.phoneTop });
     }
 
-    const phoneIconSvg = `
-    <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
-    </svg>
-  `;
-    overlays.push({ input: Buffer.from(phoneIconSvg), left: row.iconX, top: row.iconY });
+    if (shouldRenderPhoneIcon) {
+      overlays.push({ input: Buffer.from(phoneIconSvg), left: row.iconX, top: row.iconY });
+    }
 
+    const phoneRects: LayoutElementRect[] = [];
+    if (shouldRenderPhoneIcon) {
+      phoneRects.push(row.iconRect);
+    }
     if (row.textRect) {
-      phoneGroupRect = unionLayoutRects([row.iconRect, row.textRect], 4, bw, bh);
-    } else {
-      phoneGroupRect = unionLayoutRects([row.iconRect], 4, bw, bh);
+      phoneRects.push(row.textRect);
+    }
+    if (phoneRects.length > 0) {
+      phoneGroupRect = unionLayoutRects(phoneRects, 4, bw, bh);
     }
   }
 
@@ -586,14 +636,13 @@ export const overlayBrandElements = async (
   return { buffer, layoutOverlay };
 };
 
-/** GPT image only; saved as PNG under public/generated. Does not composite logos/text. */
-export const runBackgroundOnlyGeneration = async (
+/** GPT image only; returns normalized PNG bytes (no persistence). */
+export const buildBackgroundOnlyPngBuffer = async (
   values: BannerGenerationInput,
   primaryLogo?: File | null,
   secondaryLogo?: File | null
-): Promise<GeneratedBannerResult> => {
+): Promise<Buffer> => {
   const patch = getRevisionPatch(values.revisionAction);
-  // Background stage intentionally excludes direct brand text/logo cues.
   void primaryLogo;
   void secondaryLogo;
 
@@ -611,11 +660,59 @@ export const runBackgroundOnlyGeneration = async (
     width,
     height
   );
-  const basePngBuffer = await normalizeBackgroundBuffer(baseImageBuffer, values.secondaryBrandColor, width, height);
+  return normalizeBackgroundBuffer(baseImageBuffer, values.secondaryBrandColor, width, height);
+};
+
+/** GPT image only; saved as PNG under public/generated or Blob/Supabase legacy path. Does not composite logos/text. */
+export const runBackgroundOnlyGeneration = async (
+  values: BannerGenerationInput,
+  primaryLogo?: File | null,
+  secondaryLogo?: File | null
+): Promise<GeneratedBannerResult> => {
+  const basePngBuffer = await buildBackgroundOnlyPngBuffer(values, primaryLogo, secondaryLogo);
   const stored = await saveOutputPng(basePngBuffer);
   return {
     filename: stored.filename,
     imageUrl: stored.publicUrl
+  };
+};
+
+/** Deterministic logos + text + phone; does not persist. */
+export const composeOverlayFromBannerBuffer = async (
+  bannerBuffer: Buffer,
+  values: BannerGenerationInput,
+  primaryLogo: File | null,
+  secondaryLogo: File | null
+): Promise<{ pngBuffer: Buffer; layoutOverlay: LayoutOverlayPayload }> => {
+  const patch = getRevisionPatch(undefined);
+  const { buffer, layoutOverlay } = await overlayBrandElements(
+    bannerBuffer,
+    values,
+    patch.logoScale,
+    primaryLogo,
+    secondaryLogo
+  );
+  return { pngBuffer: buffer, layoutOverlay };
+};
+
+/** Deterministic logos + text + phone; persists merged PNG via `saveOutputPng`. */
+export const composeAndSaveOverlayFromBannerBuffer = async (
+  bannerBuffer: Buffer,
+  values: BannerGenerationInput,
+  primaryLogo: File | null,
+  secondaryLogo: File | null
+): Promise<GeneratedBannerResult> => {
+  const { pngBuffer, layoutOverlay } = await composeOverlayFromBannerBuffer(
+    bannerBuffer,
+    values,
+    primaryLogo,
+    secondaryLogo
+  );
+  const stored = await saveOutputPng(pngBuffer);
+  return {
+    filename: stored.filename,
+    imageUrl: stored.publicUrl,
+    layoutOverlay
   };
 };
 
@@ -627,20 +724,43 @@ export const runOverlayRender = async (
   secondaryLogo: File | null
 ): Promise<GeneratedBannerResult> => {
   const buffer = await readBackgroundBufferFromPublicUrl(backgroundPublicUrl);
-  const patch = getRevisionPatch(undefined);
-  const { buffer: pngBuffer, layoutOverlay } = await overlayBrandElements(buffer, values, patch.logoScale, primaryLogo, secondaryLogo);
-  const stored = await saveOutputPng(pngBuffer);
-  return {
-    filename: stored.filename,
-    imageUrl: stored.publicUrl,
-    layoutOverlay
-  };
+  return composeAndSaveOverlayFromBannerBuffer(buffer, values, primaryLogo, secondaryLogo);
+};
+
+const parsePromptSnapshot = (formData: FormData): string => {
+  const raw = parseFormValue(formData.get("promptSnapshot"));
+  return raw.length > 16000 ? raw.slice(0, 16000) : raw;
+};
+
+const parseOptionalDesignId = (formData: FormData): string | undefined => {
+  const raw = parseFormValue(formData.get("designId")).trim();
+  if (!raw) {
+    return undefined;
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+    throw new Error("Invalid designId.");
+  }
+  return raw;
+};
+
+const parseOptionalBackgroundStoragePath = (formData: FormData): string | undefined => {
+  const raw = parseFormValue(formData.get("backgroundStoragePath")).trim();
+  if (!raw) {
+    return undefined;
+  }
+  if (!isBannerAssetStoragePath(raw)) {
+    throw new Error("Invalid backgroundStoragePath.");
+  }
+  return raw;
 };
 
 export const parseBannerInput = (formData: FormData): {
   values: BannerGenerationInput;
   primaryLogo: File | null;
   secondaryLogo: File | null;
+  promptSnapshot: string;
+  designId?: string;
+  backgroundStoragePath?: string;
 } => {
   const validation = generationSchema.safeParse({
     bannerType: parseFormValue(formData.get("bannerType")) as BannerType,
@@ -662,6 +782,9 @@ export const parseBannerInput = (formData: FormData): {
     primaryBrandColor: parseFormValue(formData.get("primaryBrandColor")),
     secondaryBrandColor: parseFormValue(formData.get("secondaryBrandColor")),
     phoneNumber: parseFormValue(formData.get("phoneNumber")),
+    phoneNumberFontSizePx: parseFormValue(formData.get("phoneNumberFontSizePx")),
+    phoneIconSizePx: parseFormValue(formData.get("phoneIconSizePx")),
+    showPhoneIcon: parseFormValue(formData.get("showPhoneIcon")),
     phoneIconOffsetX: parseFormValue(formData.get("phoneIconOffsetX")),
     phoneIconOffsetY: parseFormValue(formData.get("phoneIconOffsetY")),
     layoutPrimaryLogoDeltaX: parseFormValue(formData.get("layoutPrimaryLogoDeltaX")),
@@ -692,7 +815,10 @@ export const parseBannerInput = (formData: FormData): {
       regenerateNonce: parseOptionalString(formData.get("regenerateNonce"))
     },
     primaryLogo,
-    secondaryLogo: parseOptionalFile(formData.get("secondaryLogo"))
+    secondaryLogo: parseOptionalFile(formData.get("secondaryLogo")),
+    promptSnapshot: parsePromptSnapshot(formData),
+    designId: parseOptionalDesignId(formData),
+    backgroundStoragePath: parseOptionalBackgroundStoragePath(formData)
   };
 };
 

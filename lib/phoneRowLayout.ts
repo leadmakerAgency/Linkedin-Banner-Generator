@@ -18,6 +18,11 @@ export type PhoneRowLayoutParams = {
   gapBetweenIconAndText: number;
   phoneIconOffsetX: number;
   phoneIconOffsetY: number;
+  /**
+   * Vertical adjustment applied to the handset icon after optical alignment (export px).
+   * Positive values move the icon down in banner coordinates.
+   */
+  iconVisualBiasY?: number;
   /** Min inset from banner edges for the whole phone row (icon + number). */
   edgeInset: number;
 };
@@ -78,7 +83,9 @@ export const computePhoneRowLayout = (p: PhoneRowLayoutParams): PhoneRowLayoutRe
 
   const anchorLeft = text ? phoneLeft : p.phoneRightX;
   let iconX = anchorLeft - p.gapBetweenIconAndText - p.iconSize + p.phoneIconOffsetX;
-  let iconY = Math.round(p.phoneRowCenterY - p.iconSize / 2) + p.phoneIconOffsetY;
+  const iconCenterY = p.phoneRowCenterY;
+  const iconVisualBiasY = p.iconVisualBiasY ?? 0;
+  let iconY = Math.round(iconCenterY - p.iconSize / 2) + p.phoneIconOffsetY + iconVisualBiasY;
 
   if (!text) {
     iconX = p.phoneRightX - p.iconSize + p.phoneIconOffsetX;

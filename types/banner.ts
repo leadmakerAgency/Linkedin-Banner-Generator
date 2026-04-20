@@ -85,6 +85,9 @@ export interface BannerFormValues {
   primaryBrandColor: string;
   secondaryBrandColor: string;
   phoneNumber: string;
+  phoneNumberFontSizePx: number;
+  phoneIconSizePx: number;
+  showPhoneIcon: boolean;
   /** Pixels to nudge only the phone handset icon (number stays fixed); positive X = right, positive Y = down. Export clamps X so the icon stays left of the number with a gap. */
   phoneIconOffsetX: number;
   phoneIconOffsetY: number;
@@ -126,6 +129,18 @@ export const FONT_SIZE_LIMITS: Record<
 > = {
   personal: { name: { min: 42, max: 108 }, desc: { min: 16, max: 40 } },
   corporate: { name: { min: 22, max: 56 }, desc: { min: 10, max: 22 } }
+};
+
+export const PHONE_NUMBER_FONT_SIZE_LIMITS = { min: 12, max: 72 } as const;
+export const PHONE_ICON_SIZE_LIMITS = { min: 12, max: 96 } as const;
+
+/** Default phone row sizing when switching or resetting banner type. */
+export const DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE: Record<
+  BannerType,
+  Pick<BannerFormValues, "phoneNumberFontSizePx" | "phoneIconSizePx" | "showPhoneIcon">
+> = {
+  personal: { phoneNumberFontSizePx: 22, phoneIconSizePx: 30, showPhoneIcon: true },
+  corporate: { phoneNumberFontSizePx: 12, phoneIconSizePx: 16, showPhoneIcon: true }
 };
 
 export interface BannerGenerationInput extends BannerFormValues {
