@@ -14,7 +14,7 @@ import {
   runOverlayRender
 } from "@/lib/generateBanner";
 import type { BannerGenerationInput } from "@/types/banner";
-import { stripCacheBustParam } from "@/lib/stripCacheBust";
+import { appendCacheBustParam, stripCacheBustParam } from "@/lib/stripCacheBust";
 
 export const runtime = "nodejs";
 
@@ -81,7 +81,7 @@ export const POST = async (request: Request) => {
 
       const signedPreview = await createSignedAssetUrl(previewStoragePath);
       return NextResponse.json({
-        imageUrl: `${signedPreview}?t=${Date.now()}`,
+        imageUrl: appendCacheBustParam(signedPreview),
         filename: previewStoragePath.split("/").pop() ?? "preview.png",
         layoutOverlay,
         designId
@@ -100,7 +100,7 @@ export const POST = async (request: Request) => {
     const output = await runOverlayRender(backgroundUrl, overlayValues, primaryLogo, secondaryLogo);
 
     return NextResponse.json({
-      imageUrl: `${output.imageUrl}?t=${Date.now()}`,
+      imageUrl: appendCacheBustParam(output.imageUrl),
       filename: output.filename,
       layoutOverlay: output.layoutOverlay,
       designId: designId ?? null

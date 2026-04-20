@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseBannerInput, runBannerGeneration } from "@/lib/generateBanner";
+import { appendCacheBustParam } from "@/lib/stripCacheBust";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,7 @@ export const POST = async (request: Request) => {
     const output = await runBannerGeneration(values, primaryLogo, secondaryLogo);
 
     return NextResponse.json({
-      imageUrl: `${output.imageUrl}?t=${Date.now()}`,
+      imageUrl: appendCacheBustParam(output.imageUrl),
       filename: output.filename,
       layoutOverlay: output.layoutOverlay
     });

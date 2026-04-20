@@ -3,6 +3,7 @@ import { getMaxImportImageBytes, fetchRemoteImageSafely } from "@/lib/background
 import { normalizeBackgroundBuffer, parseBannerInput } from "@/lib/generateBanner";
 import { isBannerDesignPersistenceEnabled, persistNewDesignAfterBackgroundPng } from "@/lib/bannerDesigns";
 import { saveOutputPng } from "@/lib/storage";
+import { appendCacheBustParam } from "@/lib/stripCacheBust";
 import { getBannerDimensions, type BannerType } from "@/types/banner";
 
 export const runtime = "nodejs";
@@ -82,7 +83,7 @@ export const POST = async (request: Request) => {
       });
 
       return NextResponse.json({
-        backgroundUrl: `${backgroundSignedUrl}?t=${Date.now()}`,
+        backgroundUrl: appendCacheBustParam(backgroundSignedUrl),
         filename: backgroundStoragePath.split("/").pop() ?? "background.png",
         designId,
         backgroundStoragePath
@@ -92,7 +93,7 @@ export const POST = async (request: Request) => {
     const stored = await saveOutputPng(normalizedPng);
 
     return NextResponse.json({
-      backgroundUrl: `${stored.publicUrl}?t=${Date.now()}`,
+      backgroundUrl: appendCacheBustParam(stored.publicUrl),
       filename: stored.filename
     });
   } catch (error) {

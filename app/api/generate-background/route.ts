@@ -5,6 +5,7 @@ import {
   runBackgroundOnlyGeneration
 } from "@/lib/generateBanner";
 import { isBannerDesignPersistenceEnabled, persistNewDesignAfterBackgroundPng } from "@/lib/bannerDesigns";
+import { appendCacheBustParam } from "@/lib/stripCacheBust";
 
 export const runtime = "nodejs";
 
@@ -23,9 +24,10 @@ export const POST = async (request: Request) => {
         source: "gpt"
       });
 
+      const busted = appendCacheBustParam(backgroundSignedUrl);
       return NextResponse.json({
-        backgroundUrl: `${backgroundSignedUrl}?t=${Date.now()}`,
-        imageUrl: `${backgroundSignedUrl}?t=${Date.now()}`,
+        backgroundUrl: busted,
+        imageUrl: busted,
         filename: backgroundStoragePath.split("/").pop() ?? "background.png",
         designId,
         backgroundStoragePath
@@ -34,9 +36,10 @@ export const POST = async (request: Request) => {
 
     const output = await runBackgroundOnlyGeneration(values, primaryLogo, secondaryLogo);
 
+    const busted = appendCacheBustParam(output.imageUrl);
     return NextResponse.json({
-      backgroundUrl: `${output.imageUrl}?t=${Date.now()}`,
-      imageUrl: `${output.imageUrl}?t=${Date.now()}`,
+      backgroundUrl: busted,
+      imageUrl: busted,
       filename: output.filename
     });
   } catch (error) {

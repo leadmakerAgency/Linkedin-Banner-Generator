@@ -5,10 +5,12 @@ const PATH_RE = new RegExp(
   `^(backgrounds|previews|logos)/(${UUID_SEGMENT})/[a-zA-Z0-9._-]+\\.png$`,
   "i"
 );
+/** Flat keys from `saveOutputPng` when using Supabase without structured design paths. */
+const LEGACY_GENERATED_RE = /^legacy-generated\/[0-9a-f-]{36}\.png$/i;
 
 export const isBannerAssetStoragePath = (path: string): boolean => {
   const trimmed = path.trim();
-  return PATH_RE.test(trimmed);
+  return PATH_RE.test(trimmed) || LEGACY_GENERATED_RE.test(trimmed);
 };
 
 export const assertBackgroundPathForDesign = (path: string, designId: string): void => {

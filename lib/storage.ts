@@ -5,7 +5,7 @@ import { randomUUID } from "crypto";
 import { createSignedAssetUrl, uploadBannerPng } from "@/lib/bannerDesigns";
 import { isSupabaseServiceConfigured } from "@/lib/supabaseAdmin";
 
-// Persisted banner PNGs: Supabase Storage (when configured), else Vercel Blob in production, else local public/generated.
+// Persisted banner PNGs: prefer Vercel Blob (stable public URLs) when configured; else Supabase; else local public/generated.
 export interface StoredAsset {
   filename: string;
   publicUrl: string;
@@ -32,10 +32,6 @@ export const saveOutputPng = async (imageBuffer: Buffer): Promise<StoredAsset> =
     );
   }
 
-  if (supabaseConfigured) {
-    return uploadLegacySupabasePng(imageBuffer);
-  }
-
   if (blobToken) {
     const blob = await put(`generated/${filename}`, imageBuffer, {
       access: "public",
@@ -48,6 +44,10 @@ export const saveOutputPng = async (imageBuffer: Buffer): Promise<StoredAsset> =
       filename,
       publicUrl: blob.url
     };
+  }
+
+  if (supabaseConfigured) {
+    return uploadLegacySupabasePng(imageBuffer);
   }
 
   const outputDirectory = path.join(process.cwd(), "public", "generated");
