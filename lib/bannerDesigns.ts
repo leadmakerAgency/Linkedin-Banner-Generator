@@ -225,39 +225,57 @@ export const appendOverlayVersion = async (input: {
   throw new Error("Failed to allocate a new overlay version after repeated conflicts.");
 };
 
-export const listDesignsForHistory = async (
-  limit: number,
-  ownerUserId: string
-): Promise<
-  Array<{
-    id: string;
-    title: string;
-    banner_type: string;
-    updated_at: string;
-    latest_preview_path: string | null;
-    latest_version: number;
-  }>
-> => {
+export type DesignHistoryListRow = {
+  id: string;
+  title: string;
+  banner_type: string;
+  updated_at: string;
+  latest_preview_path: string | null;
+  latest_version: number;
+};
+
+const HISTORY_PAGE_SIZE_MAX = 50;
+
+export const listDesignsForHistory = async (params: {
+  ownerUserId: string;
+  limit: number;
+  offset: number;
+}): Promise<{ rows: DesignHistoryListRow[]; total: number }> => {
   const supabase = getClient();
+  const limit = Math.min(Math.max(1, Math.floor(params.limit)), HISTORY_PAGE_SIZE_MAX);
+  const offset = Math.max(0, Math.floor(params.offset));
+
+  const { count, error: countError } = await supabase
+    .from("banner_designs")
+    .select("*", { count: "exact", head: true })
+    .eq("owner_user_id", params.ownerUserId);
+
+  if (countError) {
+    throw new Error(countError.message);
+  }
+  const total = count ?? 0;
+
+  if (total === 0) {
+    return { rows: [], total: 0 };
+  }
+
+  const totalPages = Math.ceil(total / limit);
+  const maxOffset = (totalPages - 1) * limit;
+  const safeOffset = Math.min(offset, maxOffset);
+
+  const end = safeOffset + limit - 1;
   const { data: designs, error: designsError } = await supabase
     .from("banner_designs")
     .select("id, title, banner_type, updated_at")
-    .eq("owner_user_id", ownerUserId)
+    .eq("owner_user_id", params.ownerUserId)
     .order("updated_at", { ascending: false })
-    .limit(limit);
+    .range(safeOffset, end);
 
   if (designsError || !designs) {
     throw new Error(designsError?.message ?? "Failed to list designs.");
   }
 
-  const results: Array<{
-    id: string;
-    title: string;
-    banner_type: string;
-    updated_at: string;
-    latest_preview_path: string | null;
-    latest_version: number;
-  }> = [];
+  const results: DesignHistoryListRow[] = [];
 
   for (const row of designs) {
     const { data: v, error: vError } = await supabase
@@ -282,7 +300,7 @@ export const listDesignsForHistory = async (
     });
   }
 
-  return results;
+  return { rows: results, total };
 };
 
 export const getDesignDetailForEdit = async (

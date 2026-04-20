@@ -13,6 +13,15 @@ export type DesignHistoryListItem = {
   previewUrl: string | null;
 };
 
+type DesignHistoryListResponse = {
+  designs?: DesignHistoryListItem[];
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  totalPages?: number;
+  error?: string;
+};
+
 type DesignHistoryPanelProps = {
   onLoadDesign: (payload: {
     values: BannerFormValues;
@@ -24,6 +33,8 @@ type DesignHistoryPanelProps = {
     files: BannerFiles;
   }) => void;
 };
+
+const PAGE_SIZE = 5;
 
 const urlToPngFile = async (url: string, filename: string): Promise<File> => {
   const response = await fetch(url);
@@ -40,17 +51,24 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<"idle" | "signed_out" | "unavailable">("idle");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [total, setTotal] = useState(0);
 
-  const handleFetchList = useCallback(async () => {
+  const fetchPage = useCallback(async (targetPage: number) => {
     setListError(null);
     setIsLoadingList(true);
     try {
-      const response = await fetch("/api/designs", { credentials: "include" });
-      const data = (await response.json()) as { designs?: DesignHistoryListItem[]; error?: string };
+      const params = new URLSearchParams({ page: String(targetPage), pageSize: String(PAGE_SIZE) });
+      const response = await fetch(`/api/designs?${params.toString()}`, { credentials: "include" });
+      const data = (await response.json()) as DesignHistoryListResponse;
 
       if (response.status === 401) {
         setHistoryStatus("signed_out");
         setDesigns([]);
+        setTotal(0);
+        setTotalPages(0);
+        setPage(1);
         setListError(null);
         return;
       }
@@ -58,6 +76,9 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
         setHistoryStatus("unavailable");
         setListError(data.error ?? "Design history is not available.");
         setDesigns([]);
+        setTotal(0);
+        setTotalPages(0);
+        setPage(1);
         return;
       }
       if (!response.ok) {
@@ -68,6 +89,9 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
 
       setHistoryStatus("idle");
       setDesigns(data.designs ?? []);
+      setPage(data.page ?? targetPage);
+      setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 0);
     } catch {
       setListError("Unable to reach history API.");
       setDesigns([]);
@@ -77,8 +101,26 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
   }, []);
 
   useEffect(() => {
-    void handleFetchList();
-  }, [handleFetchList]);
+    void fetchPage(1);
+  }, [fetchPage]);
+
+  const handleRefresh = useCallback(() => {
+    void fetchPage(page);
+  }, [fetchPage, page]);
+
+  const handlePrevPage = useCallback(() => {
+    if (page <= 1 || isLoadingList) {
+      return;
+    }
+    void fetchPage(page - 1);
+  }, [fetchPage, page, isLoadingList]);
+
+  const handleNextPage = useCallback(() => {
+    if (page >= totalPages || isLoadingList || totalPages === 0) {
+      return;
+    }
+    void fetchPage(page + 1);
+  }, [fetchPage, page, isLoadingList, totalPages]);
 
   const handleEditDesign = useCallback(
     async (designId: string) => {
@@ -130,6 +172,8 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
     [onLoadDesign]
   );
 
+  const showPagination = historyStatus === "idle" && totalPages > 1;
+
   return (
     <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -142,7 +186,7 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
         </div>
         <button
           type="button"
-          onClick={() => void handleFetchList()}
+          onClick={() => void handleRefresh()}
           disabled={isLoadingList}
           className="shrink-0 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -170,8 +214,15 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
         </p>
       ) : null}
 
+      {historyStatus === "idle" && total > 0 ? (
+        <p className="mt-3 text-xs text-slate-500" aria-live="polite">
+          Showing {designs.length} of {total} saved design{total === 1 ? "" : "s"}
+          {totalPages > 1 ? ` · Page ${page} of ${totalPages}` : null}
+        </p>
+      ) : null}
+
       {designs.length > 0 ? (
-        <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto text-xs">
+        <ul className="mt-3 space-y-2 text-xs">
           {designs.map((row) => (
             <li
               key={row.id}
@@ -195,6 +246,33 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
         </ul>
       ) : historyStatus !== "signed_out" && historyStatus !== "unavailable" && !isLoadingList && !listError ? (
         <p className="mt-3 text-xs text-slate-500">No saved designs yet.</p>
+      ) : null}
+
+      {showPagination ? (
+        <nav
+          className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3"
+          aria-label="Design history pages"
+        >
+          <button
+            type="button"
+            onClick={() => void handlePrevPage()}
+            disabled={page <= 1 || isLoadingList}
+            className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-xs text-slate-400">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleNextPage()}
+            disabled={page >= totalPages || isLoadingList}
+            className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </nav>
       ) : null}
     </div>
   );
