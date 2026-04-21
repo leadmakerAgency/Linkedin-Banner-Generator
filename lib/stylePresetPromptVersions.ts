@@ -12,6 +12,13 @@ export const STYLE_PRESET_PROMPT_VERSIONS: Record<
     "Clean geometric elements that reinforce trust, stability, and professionalism.",
     "Refined branding atmosphere suited for consultants, agencies, executives, and B2B profiles."
   ],
+  "corporate-2": [
+    "Crisp white field with overlapping royal-to-cyan gradient polygons along the sides, thin diagonal motion lines, and a wide calm center for overlays.",
+    "Bright white-dominant canvas with a large soft curved sweep, sharp corner triangles in light blue and deep charcoal, a faint dot grid, and a darker circular wash on the right third.",
+    "Pale gray low-poly facet texture, a bold navy rounded corner mass, a golden diagonal accent bar, sparse dot clusters, and a slightly brighter faceted panel toward the right.",
+    "Deep navy or graphite ground with silver-to-electric-blue gradients, high-contrast corner geometry, and restrained highlights for a premium consulting atmosphere.",
+    "Clean vertical split abstraction or thin intersecting blue and cyan line networks in the corners suggesting analytics, always preserving generous negative space for overlays."
+  ],
   modern: [
     "Sleek contemporary typography with clean edges and confident visual presence.",
     "Fresh layout with dynamic balance and intentional asymmetry.",

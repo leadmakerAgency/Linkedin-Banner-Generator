@@ -23,6 +23,7 @@ export const getBannerDimensions = (bannerType: BannerType): BannerDimensions =>
 export type CompanyPageType = "company" | "agency" | "personal-brand";
 export type StylePresetId =
   | "corporate"
+  | "corporate-2"
   | "modern"
   | "minimal"
   | "bold"

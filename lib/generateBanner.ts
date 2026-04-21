@@ -134,6 +134,7 @@ const generationSchema = z
   imageModel: z.enum(["gpt-image-1", "gpt-image-1-mini"]),
   stylePreset: z.enum([
     "corporate",
+    "corporate-2",
     "modern",
     "minimal",
     "bold",

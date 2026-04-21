@@ -42,6 +42,7 @@ const companyTypes: Array<{ value: CompanyPageType; label: string }> = [
 
 const stylePresets: Array<{ value: StylePresetId; label: string }> = [
   { value: "corporate", label: "Corporate" },
+  { value: "corporate-2", label: "Corporate 2" },
   { value: "modern", label: "Modern" },
   { value: "minimal", label: "Minimal" },
   { value: "bold", label: "Bold" },

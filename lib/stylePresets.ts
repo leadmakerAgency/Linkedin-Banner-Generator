@@ -18,6 +18,15 @@ export const STYLE_PRESETS: Record<StylePresetId, StylePreset> = {
     textColor: "#FFFFFF",
     accentColor: "#E2E8F0"
   },
+  "corporate-2": {
+    id: "corporate-2",
+    label: "Corporate 2",
+    promptTone:
+      "modern B2B marketing banner, blue-first palette, structured geometry, optional gold accent, agency-ready layouts",
+    gradientOpacity: 0.38,
+    textColor: "#FFFFFF",
+    accentColor: "#E2E8F0"
+  },
   modern: {
     id: "modern",
     label: "Modern",

@@ -12,6 +12,7 @@ const messageSchema = z.object({
 
 const stylePresetSchema = z.enum([
   "corporate",
+  "corporate-2",
   "modern",
   "minimal",
   "bold",
