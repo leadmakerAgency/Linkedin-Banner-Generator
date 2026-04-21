@@ -116,6 +116,10 @@ const generationSchema = z
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   phoneNumber: z.string().trim().max(40),
+  phoneNumberColorMode: z.enum(["auto", "manual"]),
+  phoneNumberTextColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
+  phoneIconColorMode: z.enum(["auto", "manual"]),
+  phoneIconColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/),
   phoneNumberFontSizePx: phoneNumberFontSizeField,
   phoneIconSizePx: phoneIconSizeField,
   showPhoneIcon: showPhoneIconField,
@@ -449,7 +453,14 @@ export const overlayBrandElements = async (
     values.companyDescriptionColorMode === "manual"
       ? values.companyDescriptionTextColor
       : await resolveAutoContrastColor(bannerBuffer, autoDescriptionColorSampleArea, bw, bh);
-  const phoneTextColor = await resolveAutoContrastColor(bannerBuffer, autoPhoneColorSampleArea, bw, bh);
+  const [phoneTextColor, phoneIconFill] = await Promise.all([
+    values.phoneNumberColorMode === "manual"
+      ? Promise.resolve(values.phoneNumberTextColor)
+      : resolveAutoContrastColor(bannerBuffer, autoPhoneColorSampleArea, bw, bh),
+    values.phoneIconColorMode === "manual"
+      ? Promise.resolve(values.phoneIconColor)
+      : resolveAutoContrastColor(bannerBuffer, autoPhoneColorSampleArea, bw, bh)
+  ]);
 
   const textMaxWidth = Math.max(Math.round((180 * bw) / refW), bw - currentLeft - Math.round((140 * bw) / refW));
 
@@ -563,7 +574,7 @@ export const overlayBrandElements = async (
     const phoneIconSvg = shouldRenderPhoneIcon
       ? `
     <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneTextColor}"/>
+      <path d="M2.25 4.5a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .72.53l.6 2.1a.75.75 0 0 1-.23.77l-1.05.87a11.04 11.04 0 0 0 5.28 5.28l.87-1.05a.75.75 0 0 1 .77-.23l2.1.6a.75.75 0 0 1 .53.72V15a.75.75 0 0 1-.75.75H12A9.75 9.75 0 0 1 2.25 6V4.5z" fill="${phoneIconFill}"/>
     </svg>
   `
       : "";
@@ -783,6 +794,10 @@ export const parseBannerInput = (formData: FormData): {
     primaryBrandColor: parseFormValue(formData.get("primaryBrandColor")),
     secondaryBrandColor: parseFormValue(formData.get("secondaryBrandColor")),
     phoneNumber: parseFormValue(formData.get("phoneNumber")),
+    phoneNumberColorMode: parseFormValue(formData.get("phoneNumberColorMode")) as BannerGenerationInput["phoneNumberColorMode"],
+    phoneNumberTextColor: parseFormValue(formData.get("phoneNumberTextColor")),
+    phoneIconColorMode: parseFormValue(formData.get("phoneIconColorMode")) as BannerGenerationInput["phoneIconColorMode"],
+    phoneIconColor: parseFormValue(formData.get("phoneIconColor")),
     phoneNumberFontSizePx: parseFormValue(formData.get("phoneNumberFontSizePx")),
     phoneIconSizePx: parseFormValue(formData.get("phoneIconSizePx")),
     showPhoneIcon: parseFormValue(formData.get("showPhoneIcon")),

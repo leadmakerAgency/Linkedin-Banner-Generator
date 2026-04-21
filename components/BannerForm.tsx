@@ -475,6 +475,79 @@ export const BannerForm = ({
           />
         </label>
 
+        <div className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          <span>Phone Number Text Color</span>
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
+            <label className="inline-flex items-center gap-2 font-normal text-slate-300">
+              <input
+                type="radio"
+                name="phoneNumberColorMode"
+                value="auto"
+                checked={values.phoneNumberColorMode === "auto"}
+                onChange={(event) => handleInputChange("phoneNumberColorMode", event.target.value)}
+              />
+              Auto (AI / smart contrast)
+            </label>
+            <label className="inline-flex items-center gap-2 font-normal text-slate-300">
+              <input
+                type="radio"
+                name="phoneNumberColorMode"
+                value="manual"
+                checked={values.phoneNumberColorMode === "manual"}
+                onChange={(event) => handleInputChange("phoneNumberColorMode", event.target.value)}
+              />
+              Manual
+            </label>
+            <input
+              type="color"
+              className="h-10 w-16 cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70 disabled:cursor-not-allowed disabled:opacity-60"
+              value={values.phoneNumberTextColor}
+              onChange={(event) => handleInputChange("phoneNumberTextColor", event.target.value)}
+              disabled={values.phoneNumberColorMode !== "manual"}
+              aria-label="Phone number text color"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 text-sm font-medium text-slate-300 md:col-span-2">
+          <span>Phone Handset Icon Color</span>
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3">
+            <label className="inline-flex items-center gap-2 font-normal text-slate-300">
+              <input
+                type="radio"
+                name="phoneIconColorMode"
+                value="auto"
+                checked={values.phoneIconColorMode === "auto"}
+                onChange={(event) => handleInputChange("phoneIconColorMode", event.target.value)}
+                disabled={!values.showPhoneIcon}
+              />
+              Auto (AI / smart contrast)
+            </label>
+            <label className="inline-flex items-center gap-2 font-normal text-slate-300">
+              <input
+                type="radio"
+                name="phoneIconColorMode"
+                value="manual"
+                checked={values.phoneIconColorMode === "manual"}
+                onChange={(event) => handleInputChange("phoneIconColorMode", event.target.value)}
+                disabled={!values.showPhoneIcon}
+              />
+              Manual
+            </label>
+            <input
+              type="color"
+              className="h-10 w-16 cursor-pointer rounded-xl border border-slate-700 bg-slate-950/70 disabled:cursor-not-allowed disabled:opacity-60"
+              value={values.phoneIconColor}
+              onChange={(event) => handleInputChange("phoneIconColor", event.target.value)}
+              disabled={!values.showPhoneIcon || values.phoneIconColorMode !== "manual"}
+              aria-label="Phone handset icon color"
+            />
+          </div>
+          {!values.showPhoneIcon ? (
+            <span className="text-xs font-normal text-slate-500">Icon color applies when the phone icon is shown.</span>
+          ) : null}
+        </div>
+
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
           Phone number font size (px)
           <input

@@ -68,6 +68,10 @@ const settingsSchema = z
     primaryBrandColor: z.string(),
     secondaryBrandColor: z.string(),
     phoneNumber: z.string(),
+    phoneNumberColorMode: z.enum(["auto", "manual"]),
+    phoneNumberTextColor: z.string(),
+    phoneIconColorMode: z.enum(["auto", "manual"]),
+    phoneIconColor: z.string(),
     phoneNumberFontSizePx: z.number().int().min(PHONE_NUMBER_FONT_SIZE_LIMITS.min).max(PHONE_NUMBER_FONT_SIZE_LIMITS.max),
     phoneIconSizePx: z.number().int().min(PHONE_ICON_SIZE_LIMITS.min).max(PHONE_ICON_SIZE_LIMITS.max),
     showPhoneIcon: z.boolean(),
@@ -116,6 +120,10 @@ const patchSchema = z.object({
   primaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   secondaryBrandColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   phoneNumber: z.string().max(40).optional(),
+  phoneNumberColorMode: z.enum(["auto", "manual"]).optional(),
+  phoneNumberTextColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
+  phoneIconColorMode: z.enum(["auto", "manual"]).optional(),
+  phoneIconColor: z.string().regex(/^#([A-Fa-f0-9]{6})$/).optional(),
   phoneNumberFontSizePx: z
     .number()
     .int()
@@ -190,7 +198,7 @@ export const POST = async (request: Request) => {
             {
               role: "system",
               content:
-                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameFontSize, companyDescriptionFontSize, companyNameFontWeight, companyDescriptionFontWeight, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, phoneNumberFontSizePx, phoneIconSizePx, showPhoneIcon, phoneIconOffsetX, phoneIconOffsetY, imageModel, stylePreset."
+                "Extract only setting changes from user request into JSON. Return only JSON object with optional keys: bannerType, companyName, companyDescription, companyNameFontStyle, companyDescriptionFontStyle, companyNameFontSize, companyDescriptionFontSize, companyNameFontWeight, companyDescriptionFontWeight, companyNameColorMode, companyNameTextColor, companyDescriptionColorMode, companyDescriptionTextColor, companyPageType, primaryBrandColor, secondaryBrandColor, phoneNumber, phoneNumberColorMode, phoneNumberTextColor, phoneIconColorMode, phoneIconColor, phoneNumberFontSizePx, phoneIconSizePx, showPhoneIcon, phoneIconOffsetX, phoneIconOffsetY, imageModel, stylePreset."
             },
             {
               role: "user",

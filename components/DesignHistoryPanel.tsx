@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { BannerFiles } from "@/components/BannerForm";
-import type { BannerFormValues, LayoutOverlayPayload } from "@/types/banner";
+import { hydrateBannerFormValues, type BannerFormValues, type LayoutOverlayPayload } from "@/types/banner";
 
 export type DesignHistoryListItem = {
   id: string;
@@ -157,7 +157,7 @@ export const DesignHistoryPanel = ({ onLoadDesign }: DesignHistoryPanelProps) =>
             : null;
 
         onLoadDesign({
-          values: data.snapshot.form,
+          values: hydrateBannerFormValues(data.snapshot.form),
           promptSnapshot: data.snapshot.promptSnapshot,
           layoutOverlay: data.snapshot.layoutOverlay,
           backgroundDisplayUrl: data.backgroundSignedUrl,

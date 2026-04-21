@@ -56,6 +56,8 @@ export type FontStyleId =
   | "dmSans"
   | "libreBaskerville";
 export type CompanyNameColorMode = "auto" | "manual";
+export type PhoneNumberColorMode = "auto" | "manual";
+export type PhoneIconColorMode = "auto" | "manual";
 
 /** Numeric CSS/SVG font-weight values (100–900). */
 export type FontWeightId = "300" | "400" | "500" | "600" | "700" | "800";
@@ -86,6 +88,10 @@ export interface BannerFormValues {
   primaryBrandColor: string;
   secondaryBrandColor: string;
   phoneNumber: string;
+  phoneNumberColorMode: PhoneNumberColorMode;
+  phoneNumberTextColor: string;
+  phoneIconColorMode: PhoneIconColorMode;
+  phoneIconColor: string;
   phoneNumberFontSizePx: number;
   phoneIconSizePx: number;
   showPhoneIcon: boolean;
@@ -143,6 +149,25 @@ export const DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE: Record<
   personal: { phoneNumberFontSizePx: 22, phoneIconSizePx: 30, showPhoneIcon: true },
   corporate: { phoneNumberFontSizePx: 12, phoneIconSizePx: 16, showPhoneIcon: true }
 };
+
+/** Defaults for fields added after early snapshots; merged when hydrating saved designs. */
+export const BANNER_FORM_HYDRATION_DEFAULTS: Pick<
+  BannerFormValues,
+  "phoneNumberColorMode" | "phoneNumberTextColor" | "phoneIconColorMode" | "phoneIconColor"
+> = {
+  phoneNumberColorMode: "auto",
+  phoneNumberTextColor: "#FFFFFF",
+  phoneIconColorMode: "auto",
+  phoneIconColor: "#E2E8F0"
+};
+
+export const hydrateBannerFormValues = (form: BannerFormValues): BannerFormValues => ({
+  ...form,
+  phoneNumberColorMode: form.phoneNumberColorMode ?? BANNER_FORM_HYDRATION_DEFAULTS.phoneNumberColorMode,
+  phoneNumberTextColor: form.phoneNumberTextColor ?? BANNER_FORM_HYDRATION_DEFAULTS.phoneNumberTextColor,
+  phoneIconColorMode: form.phoneIconColorMode ?? BANNER_FORM_HYDRATION_DEFAULTS.phoneIconColorMode,
+  phoneIconColor: form.phoneIconColor ?? BANNER_FORM_HYDRATION_DEFAULTS.phoneIconColor
+});
 
 export interface BannerGenerationInput extends BannerFormValues {
   revisionAction?: RevisionAction;

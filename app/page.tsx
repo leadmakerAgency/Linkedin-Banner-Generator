@@ -40,6 +40,10 @@ const INITIAL_VALUES: BannerFormValues = {
   primaryBrandColor: "#1D4ED8",
   secondaryBrandColor: "#0F172A",
   phoneNumber: "",
+  phoneNumberColorMode: "auto",
+  phoneNumberTextColor: "#FFFFFF",
+  phoneIconColorMode: "auto",
+  phoneIconColor: "#E2E8F0",
   phoneNumberFontSizePx: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.phoneNumberFontSizePx,
   phoneIconSizePx: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.phoneIconSizePx,
   showPhoneIcon: DEFAULT_PHONE_LAYOUT_FOR_BANNER_TYPE.personal.showPhoneIcon,
@@ -151,7 +155,14 @@ const HomePage = () => {
     values.companyDescriptionColorMode === "auto"
       ? "Company description text color: Auto (AI chooses the best fitting contrast color based on the generated design)."
       : `Company description text color (manual): ${values.companyDescriptionTextColor}.`,
-    "Phone number text color: Auto (AI chooses the best fitting contrast color based on the generated design).",
+    values.phoneNumberColorMode === "auto"
+      ? "Phone number text color: Auto (AI chooses the best fitting contrast color based on the generated design)."
+      : `Phone number text color (manual): ${values.phoneNumberTextColor}.`,
+    values.showPhoneIcon
+      ? values.phoneIconColorMode === "auto"
+        ? "Phone handset icon color: Auto (AI chooses the best fitting contrast color based on the generated design)."
+        : `Phone handset icon color (manual): ${values.phoneIconColor}.`
+      : "Phone handset icon: hidden.",
     `Company type: ${values.companyPageType}.`,
     `Primary brand color: ${values.primaryBrandColor}.`,
     `Secondary brand color: ${values.secondaryBrandColor}.`,
@@ -190,6 +201,10 @@ const HomePage = () => {
       formData.set("companyNameTextColor", v.companyNameTextColor);
       formData.set("companyDescriptionColorMode", v.companyDescriptionColorMode);
       formData.set("companyDescriptionTextColor", v.companyDescriptionTextColor);
+      formData.set("phoneNumberColorMode", v.phoneNumberColorMode);
+      formData.set("phoneNumberTextColor", v.phoneNumberTextColor);
+      formData.set("phoneIconColorMode", v.phoneIconColorMode);
+      formData.set("phoneIconColor", v.phoneIconColor);
       formData.set("companyPageType", v.companyPageType);
       formData.set("primaryBrandColor", v.primaryBrandColor);
       formData.set("secondaryBrandColor", v.secondaryBrandColor);
